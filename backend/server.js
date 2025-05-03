@@ -139,9 +139,16 @@ app.post("/login", async (req, res) => {
 
     res.cookie("jwt_token", token, {
       httpOnly: true,
-      secure: true,
+      secure: process.env.NODE_ENV === "production",
       sameSite: "None",
+      path: "/",
     });
+    console.log(
+      "Cookie set for user:",
+      email,
+      "Token:",
+      token.substring(0, 20) + "..."
+    );
     console.log("Login successful for:", email);
     res.json({
       message: "Login successful",
@@ -154,7 +161,6 @@ app.post("/login", async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
-
 // User Logout
 app.post("/logout", (req, res) => {
   res.cookie("jwt_token", "", {
