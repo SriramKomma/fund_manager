@@ -1,6 +1,7 @@
 import { Component } from "react";
 import Cookies from "js-cookie";
 import { Redirect } from "react-router-dom";
+import axios from "axios";
 import "./index.css";
 
 class Login extends Component {
@@ -22,11 +23,13 @@ class Login extends Component {
   onSubmitSuccess = (data) => {
     const { history } = this.props;
     Cookies.set("jwt_token", data.token, { expires: 30, path: "/" });
-    // Store both userId and username in localStorage
-    localStorage.setItem(
-      "user",
-      JSON.stringify({ userId: data.userId, username: data.username })
-    );
+    const userData = {
+      userId: data.userId,
+      username: data.username,
+      token: data.token, // Store token for Authorization header
+    };
+    console.log("Saving to localStorage:", userData); // Debug log
+    localStorage.setItem("user", JSON.stringify(userData));
     history.replace("/");
   };
 
@@ -49,28 +52,23 @@ class Login extends Component {
       return;
     }
 
-    const userDetails = { email, password };
-    const url = `${process.env.REACT_APP_API_URL}/login`; // Use environment variable
-    const options = {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(userDetails),
-    };
-
     try {
-      const response = await fetch(url, options);
-      const data = await response.json();
-      console.log("Login response:", data); // Debug log
-      if (response.ok) {
-        this.onSubmitSuccess(data);
+      const response = await axios.post(
+        `${process.env.REACT_APP_API_URL}/login`,
+        { email, password },
+        { withCredentials: true }
+      );
+      console.log("Login response:", response.data); // Debug log
+      if (response.status === 200) {
+        this.onSubmitSuccess(response.data);
       } else {
-        this.onSubmitFailure(data.error || "Invalid credentials");
+        this.onSubmitFailure(response.data.error || "Invalid credentials");
       }
     } catch (error) {
-      console.error("Login fetch error:", error);
-      this.onSubmitFailure("Network error. Please try again.");
+      console.error("Login error:", error.response?.data || error);
+      this.onSubmitFailure(
+        error.response?.data?.error || "Network error. Please try again."
+      );
     }
   };
 
@@ -89,6 +87,7 @@ class Login extends Component {
           onChange={this.onChangePassword}
           placeholder="Enter your password"
           required
+          autoComplete="current-password"
         />
       </div>
     );
@@ -109,6 +108,7 @@ class Login extends Component {
           onChange={this.onChangeEmail}
           placeholder="Enter your email"
           required
+          autoComplete="email"
         />
       </div>
     );
