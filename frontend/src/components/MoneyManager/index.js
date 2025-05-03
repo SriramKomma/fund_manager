@@ -49,6 +49,10 @@ class MoneyManager extends Component {
   }
 
   fetchTransactions = () => {
+    console.log(
+      "Fetching transactions with URL:",
+      process.env.REACT_APP_API_URL + "/transaction"
+    );
     axios
       .get(`${process.env.REACT_APP_API_URL}/transaction`, {
         withCredentials: true,
@@ -60,11 +64,10 @@ class MoneyManager extends Component {
       .catch((error) => {
         console.error(
           "Error fetching transactions:",
-          error.response?.data || error
+          error.response?.data || error.message
         );
       });
   };
-
   initializeScanner = () => {
     const videoElem = document.getElementById("scanner-video");
     if (videoElem) {
