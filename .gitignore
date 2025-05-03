@@ -19,3 +19,6 @@ dist/
 .vscode/
 *.sublime-project
 *.sublime-workspace
+
+# Generated PDF reports
+backend/Transaction_Report_*.pdf

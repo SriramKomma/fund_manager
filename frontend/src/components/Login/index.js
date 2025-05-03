@@ -50,7 +50,7 @@ class Login extends Component {
     }
 
     const userDetails = { email, password };
-    const url = "http://localhost:3001/login";
+    const url = `${process.env.REACT_APP_API_URL}/login`; // Use environment variable
     const options = {
       method: "POST",
       headers: {
@@ -62,12 +62,14 @@ class Login extends Component {
     try {
       const response = await fetch(url, options);
       const data = await response.json();
+      console.log("Login response:", data); // Debug log
       if (response.ok) {
         this.onSubmitSuccess(data);
       } else {
         this.onSubmitFailure(data.error || "Invalid credentials");
       }
     } catch (error) {
+      console.error("Login fetch error:", error);
       this.onSubmitFailure("Network error. Please try again.");
     }
   };

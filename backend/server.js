@@ -8,18 +8,25 @@ const { v4: uuidv4 } = require("uuid");
 const cron = require("node-cron");
 const PDFDocument = require("pdfkit");
 const fs = require("fs");
+const dotenv = require("dotenv");
+
+dotenv.config();
 
 const app = express();
-const port = 3001;
+const port = process.env.PORT || 3001; // Use Render's PORT or 3001 locally
 
 // Middleware
-app.use(cors({ origin: "http://localhost:3000", credentials: true }));
+app.use(
+  cors({
+    origin: ["http://localhost:3000", "https://fund-manager-six.vercel.app"],
+    credentials: true,
+  })
+);
 app.use(express.json());
 app.use(cookieParser());
 
 // MongoDB Atlas Connection
-const uri =
-  "mongodb+srv://sriramkomma2443:Lowda12345@mydb-cluster.46hwdk7.mongodb.net/?retryWrites=true&w=majority&appName=mydb-cluster";
+const uri = process.env.MONGO_URI;
 const client = new MongoClient(uri);
 
 let db;
@@ -127,12 +134,13 @@ app.post("/login", async (req, res) => {
       { expiresIn: "1h" }
     );
 
-    res.cookie("jwt_token", token, { httpOnly: true, secure: false });
+    res.cookie("jwt_token", token, { httpOnly: true, secure: true }); // secure: true for HTTPS
     console.log("Login successful for:", email);
     res.json({
       message: "Login successful",
       token,
       userId: user._id.toString(),
+      username: user.username, // Added username
     });
   } catch (err) {
     console.error("Login error:", err);
@@ -144,7 +152,7 @@ app.post("/login", async (req, res) => {
 app.post("/logout", (req, res) => {
   res.cookie("jwt_token", "", {
     httpOnly: true,
-    secure: false,
+    secure: true,
     expires: new Date(0),
   });
   res.json({ message: "Logged out successfully" });
@@ -493,5 +501,5 @@ app.get("/generate-pdf", verifyToken, async (req, res) => {
 
 // **Start Server**
 app.listen(port, () => {
-  console.log(`Server running on http://localhost:${port}`);
+  console.log(`Server running on port ${port}`);
 });

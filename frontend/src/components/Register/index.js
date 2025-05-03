@@ -49,7 +49,7 @@ class Register extends Component {
     }
 
     const userDetails = { username, email, password };
-    const url = "http://localhost:3001/register";
+    const url = `${process.env.REACT_APP_API_URL}/register`; // Use environment variable
     const options = {
       method: "POST",
       headers: {
@@ -61,12 +61,14 @@ class Register extends Component {
     try {
       const response = await fetch(url, options);
       const data = await response.json();
+      console.log("Register response:", data); // Debug log
       if (response.ok) {
         this.onSubmitSuccess();
       } else {
         this.onSubmitFailure(data.error || "Registration failed. Try again.");
       }
     } catch (error) {
+      console.error("Register fetch error:", error);
       this.onSubmitFailure("Network error. Please try again.");
     }
   };
@@ -142,7 +144,7 @@ class Register extends Component {
         <div className="register-card">
           <div className="logo-container">
             <img
-              src="https://cdn-icons-png.flaticon.com/512/2995/2995353.png" // Money Manager logo
+              src="https://cdn-icons-png.flaticon.com/512/2995/2995353.png"
               className="logo-image"
               alt="money manager logo"
             />

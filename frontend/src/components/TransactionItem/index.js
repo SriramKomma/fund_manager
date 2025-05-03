@@ -8,6 +8,7 @@ class TransactionItem extends Component {
     title: this.props.transactionDetails.title,
     amount: this.props.transactionDetails.amount,
     type: this.props.transactionDetails.type,
+    error: "", // Add error state for validation
   };
 
   toggleEdit = () => {
@@ -16,6 +17,7 @@ class TransactionItem extends Component {
       title: this.props.transactionDetails.title,
       amount: this.props.transactionDetails.amount,
       type: this.props.transactionDetails.type,
+      error: "", // Clear error on toggle
     }));
   };
 
@@ -27,15 +29,28 @@ class TransactionItem extends Component {
     const { transactionDetails, updateTransaction } = this.props;
     const { title, amount, type } = this.state;
 
+    // Validate inputs
+    if (!title.trim()) {
+      this.setState({ error: "Title is required" });
+      return;
+    }
+    if (!amount || isNaN(amount) || parseInt(amount) <= 0) {
+      this.setState({ error: "Valid amount is required" });
+      return;
+    }
+
     const updatedTransaction = {
-      title,
+      title: title.trim(),
       amount: parseInt(amount),
       type,
     };
 
-    console.log("Saving transaction:", updatedTransaction);
+    console.log(
+      `Saving transaction ID: ${transactionDetails.transactionId}`,
+      updatedTransaction
+    );
     updateTransaction(transactionDetails.transactionId, updatedTransaction);
-    this.setState({ isEditing: false });
+    this.setState({ isEditing: false, error: "" });
   };
 
   deleteTransaction = () => {
@@ -49,7 +64,7 @@ class TransactionItem extends Component {
 
   render() {
     const { transactionDetails, isNightMode } = this.props;
-    const { isEditing, title, amount, type } = this.state;
+    const { isEditing, title, amount, type, error } = this.state;
 
     return (
       <li className={`transaction-item ${isNightMode ? "night-mode" : ""}`}>
@@ -60,12 +75,15 @@ class TransactionItem extends Component {
               value={title}
               onChange={this.onChangeTitle}
               className="edit-field"
+              placeholder="Enter title"
             />
             <input
               type="number"
               value={amount}
               onChange={this.onChangeAmount}
               className="edit-field"
+              placeholder="Enter amount"
+              min="1"
             />
             <select
               value={type}
@@ -81,6 +99,7 @@ class TransactionItem extends Component {
               <FaSave className="save-btn" onClick={this.saveTransaction} />
               <FaTimes className="cancel-btn" onClick={this.toggleEdit} />
             </div>
+            {error && <p className="error-msg">{error}</p>}
           </>
         ) : (
           <>

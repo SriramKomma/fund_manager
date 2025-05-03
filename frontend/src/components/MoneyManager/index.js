@@ -34,6 +34,7 @@ class MoneyManager extends Component {
     this.fetchTransactions();
     // Load username from localStorage
     const user = JSON.parse(localStorage.getItem("user"));
+    console.log("localStorage user:", user); // Debug log
     if (user && user.username) {
       this.setState({ username: user.username });
     }
@@ -53,9 +54,19 @@ class MoneyManager extends Component {
 
   fetchTransactions = () => {
     axios
-      .get("http://localhost:3001/transaction", { withCredentials: true })
-      .then((response) => this.setState({ transactionsList: response.data }))
-      .catch((error) => console.error("Error fetching transactions:", error));
+      .get(`${process.env.REACT_APP_API_URL}/transaction`, {
+        withCredentials: true,
+      })
+      .then((response) => {
+        console.log("Fetch transactions response:", response.data); // Debug log
+        this.setState({ transactionsList: response.data });
+      })
+      .catch((error) => {
+        console.error(
+          "Error fetching transactions:",
+          error.response?.data || error
+        );
+      });
   };
 
   initializeScanner = () => {
@@ -126,15 +137,16 @@ class MoneyManager extends Component {
     };
 
     axios
-      .post("http://localhost:3001/transaction", expense, {
+      .post(`${process.env.REACT_APP_API_URL}/transaction`, expense, {
         withCredentials: true,
       })
-      .then(() => {
+      .then((response) => {
+        console.log("Add expense response:", response.data); // Debug log
         this.fetchTransactions();
         setTimeout(() => this.setState({ transactionStatus: null }), 3000);
       })
       .catch((error) => {
-        console.error("Error adding expense:", error);
+        console.error("Error adding expense:", error.response?.data || error);
         this.setState({ transactionStatus: "Error adding to expenses" });
       });
   };
@@ -153,11 +165,11 @@ class MoneyManager extends Component {
 
   deleteTransaction = (transactionId) => {
     axios
-      .delete(`http://localhost:3001/transaction/${transactionId}`, {
+      .delete(`${process.env.REACT_APP_API_URL}/transaction/${transactionId}`, {
         withCredentials: true,
       })
       .then((response) => {
-        console.log("Delete response:", response.data);
+        console.log("Delete response:", response.data); // Debug log
         this.setState((prevState) => ({
           transactionsList: prevState.transactionsList.filter(
             (t) => t.transactionId !== transactionId
@@ -174,11 +186,19 @@ class MoneyManager extends Component {
 
   clearAllTransactions = () => {
     axios
-      .delete("http://localhost:3001/transactions/clear", {
+      .delete(`${process.env.REACT_APP_API_URL}/transactions/clear`, {
         withCredentials: true,
       })
-      .then(() => this.setState({ transactionsList: [] }))
-      .catch((error) => console.error("Error clearing transactions:", error));
+      .then((response) => {
+        console.log("Clear transactions response:", response.data); // Debug log
+        this.setState({ transactionsList: [] });
+      })
+      .catch((error) => {
+        console.error(
+          "Error clearing transactions:",
+          error.response?.data || error
+        );
+      });
   };
 
   updateTransaction = (transactionId, updatedTransaction) => {
@@ -190,12 +210,12 @@ class MoneyManager extends Component {
     );
     axios
       .put(
-        `http://localhost:3001/transaction/${transactionId}`,
+        `${process.env.REACT_APP_API_URL}/transaction/${transactionId}`,
         updatedTransaction,
         { withCredentials: true }
       )
       .then((response) => {
-        console.log("Update response:", response.data);
+        console.log("Update response:", response.data); // Debug log
         this.fetchTransactions();
       })
       .catch((error) => {
@@ -214,11 +234,14 @@ class MoneyManager extends Component {
     );
     const userId = JSON.parse(localStorage.getItem("user"))?.userId;
 
-    if (!userId) return console.error("User ID not found!");
+    if (!userId) {
+      console.error("User ID not found!");
+      return;
+    }
 
     axios
       .post(
-        "http://localhost:3001/transaction",
+        `${process.env.REACT_APP_API_URL}/transaction`,
         {
           title: titleInput,
           amount: parseInt(amountInput),
@@ -227,7 +250,8 @@ class MoneyManager extends Component {
         },
         { withCredentials: true }
       )
-      .then(() => {
+      .then((response) => {
+        console.log("Add transaction response:", response.data); // Debug log
         this.fetchTransactions();
         this.setState({
           titleInput: "",
@@ -235,7 +259,12 @@ class MoneyManager extends Component {
           optionId: transactionTypeOptions[0].optionId,
         });
       })
-      .catch((error) => console.error("Error adding transaction:", error));
+      .catch((error) => {
+        console.error(
+          "Error adding transaction:",
+          error.response?.data || error
+        );
+      });
   };
 
   onChangeOptionId = (event) => this.setState({ optionId: event.target.value });
@@ -262,12 +291,25 @@ class MoneyManager extends Component {
 
   logout = () => {
     axios
-      .post("http://localhost:3001/logout", {}, { withCredentials: true })
-      .then(() => {
+      .post(
+        `${process.env.REACT_APP_API_URL}/logout`,
+        {},
+        {
+          withCredentials: true,
+        }
+      )
+      .then((response) => {
+        console.log("Logout response:", response.data); // Debug log
         Cookies.remove("jwt_token");
         window.location.href = "/login";
       })
-      .catch((error) => console.error("Logout failed:", error));
+      .catch((error) => {
+        console.error("Logout failed:", error.response?.data || error);
+      });
+  };
+
+  downloadPDF = () => {
+    window.open(`${process.env.REACT_APP_API_URL}/generate-pdf`, "_blank");
   };
 
   render() {
@@ -279,7 +321,7 @@ class MoneyManager extends Component {
       isScannerActive,
       isNightMode,
       transactionStatus,
-      username, // Add username to destructuring
+      username,
     } = this.state;
     const balanceAmount = this.getBalance();
     const incomeAmount = this.getIncome();
@@ -303,9 +345,7 @@ class MoneyManager extends Component {
             <div className="action-buttons">
               <FaCloudDownloadAlt
                 className="icon-btn"
-                onClick={() =>
-                  window.open("http://localhost:3001/generate-pdf", "_blank")
-                }
+                onClick={this.downloadPDF}
                 title="Download Report"
               />
               <MdDeleteForever
