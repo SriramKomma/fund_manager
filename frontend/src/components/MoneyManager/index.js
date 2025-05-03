@@ -309,7 +309,25 @@ class MoneyManager extends Component {
   };
 
   downloadPDF = () => {
-    window.open(`${process.env.REACT_APP_API_URL}/generate-pdf`, "_blank");
+    axios
+      .get(`${process.env.REACT_APP_API_URL}/generate-pdf`, {
+        withCredentials: true,
+        responseType: "blob",
+      })
+      .then((response) => {
+        const blob = new Blob([response.data], { type: "application/pdf" });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `Transaction_Report_${
+          new Date().toISOString().split("T")[0]
+        }.pdf`;
+        link.click();
+        window.URL.revokeObjectURL(url);
+      })
+      .catch((error) => {
+        console.error("Error downloading PDF:", error.response?.data || error);
+      });
   };
 
   render() {
