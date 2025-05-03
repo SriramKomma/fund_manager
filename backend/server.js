@@ -13,15 +13,18 @@ const dotenv = require("dotenv");
 dotenv.config();
 
 const app = express();
-const port = process.env.PORT || 3001; // Use Render's PORT or 3001 locally
+const port = process.env.PORT || 3001;
 
 // Middleware
 app.use(
   cors({
     origin: ["http://localhost:3000", "https://fund-manager-six.vercel.app"],
     credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
+app.options("*", cors()); // Handle preflight OPTIONS requests
 app.use(express.json());
 app.use(cookieParser());
 
@@ -57,7 +60,7 @@ const verifyToken = (req, res, next) => {
   });
 };
 
-// **User Registration**
+// User Registration
 app.post("/register", async (req, res) => {
   console.log("Register request received:", req.body);
   const { username, email, password } = req.body;
@@ -97,7 +100,7 @@ app.post("/register", async (req, res) => {
   }
 });
 
-// **User Login**
+// User Login
 app.post("/login", async (req, res) => {
   console.log("Login request received:", req.body);
   const { email, password } = req.body;
@@ -138,7 +141,7 @@ app.post("/login", async (req, res) => {
       httpOnly: true,
       secure: true,
       sameSite: "None",
-    }); // Added sameSite
+    });
     console.log("Login successful for:", email);
     res.json({
       message: "Login successful",
@@ -152,17 +155,18 @@ app.post("/login", async (req, res) => {
   }
 });
 
-// **User Logout**
+// User Logout
 app.post("/logout", (req, res) => {
   res.cookie("jwt_token", "", {
     httpOnly: true,
     secure: true,
+    sameSite: "None",
     expires: new Date(0),
   });
   res.json({ message: "Logged out successfully" });
 });
 
-// **Get Transactions**
+// Get Transactions
 app.get("/transaction", verifyToken, async (req, res) => {
   const userId = req.user.userId;
 
@@ -179,7 +183,7 @@ app.get("/transaction", verifyToken, async (req, res) => {
   }
 });
 
-// **Create Transaction**
+// Create Transaction
 app.post("/transaction", async (req, res) => {
   console.log("Transaction request received:", req.body);
   const { title, amount, type, userId } = req.body;
@@ -210,7 +214,7 @@ app.post("/transaction", async (req, res) => {
   }
 });
 
-// **Delete Transaction**
+// Delete Transaction
 app.delete("/transaction/:id", verifyToken, async (req, res) => {
   const { id } = req.params;
   const userId = req.user.userId;
@@ -255,7 +259,7 @@ app.delete("/transaction/:id", verifyToken, async (req, res) => {
   }
 });
 
-// **Clear Transactions**
+// Clear Transactions
 app.delete("/transactions/clear", verifyToken, async (req, res) => {
   const userId = req.user.userId;
 
@@ -277,7 +281,7 @@ app.delete("/transactions/clear", verifyToken, async (req, res) => {
   }
 });
 
-// **Update Transaction**
+// Update Transaction
 app.put("/transaction/:id", verifyToken, async (req, res) => {
   const { id } = req.params;
   const { title, amount, type } = req.body;
@@ -324,7 +328,7 @@ app.put("/transaction/:id", verifyToken, async (req, res) => {
   }
 });
 
-// **Cron Job: Month-End Balance**
+// Cron Job: Month-End Balance
 cron.schedule("59 23 28-31 * *", async () => {
   console.log("Cron job running at month's end...");
   const currentMonth = new Date().getMonth() + 1;
@@ -366,7 +370,7 @@ cron.schedule("59 23 28-31 * *", async () => {
   }
 });
 
-// **Generate PDF Report**
+// Generate PDF Report
 app.get("/generate-pdf", verifyToken, async (req, res) => {
   const userId = req.user.userId;
   const fileName = `Transaction_Report_${
@@ -388,7 +392,6 @@ app.get("/generate-pdf", verifyToken, async (req, res) => {
     }, 0);
     const remainingAmount = totalIncome - totalExpenses;
 
-    // Debug logs to verify calculations
     console.log("PDF Calculations for user:", userId);
     console.log("Total Income:", totalIncome);
     console.log("Total Expenses:", totalExpenses);
@@ -503,7 +506,7 @@ app.get("/generate-pdf", verifyToken, async (req, res) => {
   }
 });
 
-// **Start Server**
+// Start Server
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
