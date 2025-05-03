@@ -134,13 +134,17 @@ app.post("/login", async (req, res) => {
       { expiresIn: "1h" }
     );
 
-    res.cookie("jwt_token", token, { httpOnly: true, secure: true }); // secure: true for HTTPS
+    res.cookie("jwt_token", token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "None",
+    }); // Added sameSite
     console.log("Login successful for:", email);
     res.json({
       message: "Login successful",
       token,
       userId: user._id.toString(),
-      username: user.username, // Added username
+      username: user.username,
     });
   } catch (err) {
     console.error("Login error:", err);
