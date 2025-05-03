@@ -49,8 +49,8 @@ class MoneyManager extends Component {
   }
 
   fetchTransactions = () => {
-    const user = JSON.parse(localStorage.getItem("user"));
-    const token = user?.token || "";
+    const user = JSON.parse(localStorage.getItem("user")) || {};
+    const token = user.token || Cookies.get("jwt_token") || "";
     console.log("User from localStorage:", user);
     console.log(
       "Token for Authorization:",
@@ -62,18 +62,21 @@ class MoneyManager extends Component {
     );
     axios
       .get(`${process.env.REACT_APP_API_URL}/transaction`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: token ? `Bearer ${token}` : "" },
         withCredentials: true,
       })
       .then((response) => {
+        console.log("Fetch transactions status:", response.status);
         console.log("Fetch transactions response:", response.data);
-        this.setState({ transactionsList: response.data });
+        this.setState({ transactionsList: response.data || [] });
       })
       .catch((error) => {
         console.error(
           "Error fetching transactions:",
+          error.response?.status,
           error.response?.data || error.message
         );
+        this.setState({ transactionsList: [] });
       });
   };
   initializeScanner = () => {
