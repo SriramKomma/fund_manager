@@ -22,13 +22,18 @@ class Login extends Component {
 
   onSubmitSuccess = (data) => {
     const { history } = this.props;
-    Cookies.set("jwt_token", data.token, { expires: 30, path: "/" });
+    Cookies.set("jwt_token", data.token, {
+      expires: 30,
+      path: "/",
+      sameSite: "none",
+      secure: true,
+    });
     const userData = {
       userId: data.userId,
       username: data.username,
-      token: data.token, // Store token for Authorization header
+      token: data.token,
     };
-    console.log("Saving to localStorage:", userData); // Debug log
+    console.log("Saving to localStorage:", userData);
     localStorage.setItem("user", JSON.stringify(userData));
     history.replace("/");
   };
@@ -58,7 +63,7 @@ class Login extends Component {
         { email, password },
         { withCredentials: true }
       );
-      console.log("Login response:", response.data); // Debug log
+      console.log("Login response:", response.data);
       if (response.status === 200) {
         this.onSubmitSuccess(response.data);
       } else {

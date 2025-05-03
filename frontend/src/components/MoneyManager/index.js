@@ -47,16 +47,18 @@ class MoneyManager extends Component {
       this.qrScanner.destroy();
     }
   }
+
   fetchTransactions = () => {
     const user = JSON.parse(localStorage.getItem("user"));
     const token = user?.token || "";
-    console.log(
-      "Fetching transactions with URL:",
-      process.env.REACT_APP_API_URL + "/transaction"
-    );
+    console.log("User from localStorage:", user);
     console.log(
       "Token for Authorization:",
       token ? token.substring(0, 20) + "..." : "None"
+    );
+    console.log(
+      "Fetching transactions with URL:",
+      process.env.REACT_APP_API_URL + "/transaction"
     );
     axios
       .get(`${process.env.REACT_APP_API_URL}/transaction`, {
