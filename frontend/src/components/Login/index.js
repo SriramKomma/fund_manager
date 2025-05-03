@@ -1,152 +1,82 @@
 import { Component } from "react";
-import Cookies from "js-cookie";
-import { Redirect } from "react-router-dom";
+import axios from "axios";
 import "./index.css";
 
 class Login extends Component {
   state = {
     email: "",
     password: "",
-    showSubmitError: false,
     errorMsg: "",
   };
 
-  onChangeEmail = (event) => {
-    this.setState({ email: event.target.value });
-  };
-
-  onChangePassword = (event) => {
-    this.setState({ password: event.target.value });
-  };
-
-  onSubmitSuccess = (data) => {
-    const { history } = this.props;
-    Cookies.set("jwt_token", data.token, { expires: 30, path: "/" });
-    // Store both userId and username in localStorage
-    localStorage.setItem(
-      "user",
-      JSON.stringify({ userId: data.userId, username: data.username })
-    );
-    history.replace("/");
-  };
-
-  onSubmitFailure = (errorMsg) => {
-    this.setState({ showSubmitError: true, errorMsg });
-  };
-
-  submitForm = async (event) => {
+  onSubmitForm = async (event) => {
     event.preventDefault();
     const { email, password } = this.state;
 
-    if (!email || !password) {
-      this.onSubmitFailure("Email and password are required");
-      return;
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      this.onSubmitFailure("Please enter a valid email");
-      return;
-    }
-
-    const userDetails = { email, password };
-    const url = `${process.env.REACT_APP_API_URL}/login`; // Use environment variable
-    const options = {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(userDetails),
-    };
-
     try {
-      const response = await fetch(url, options);
-      const data = await response.json();
-      console.log("Login response:", data); // Debug log
-      if (response.ok) {
-        this.onSubmitSuccess(data);
-      } else {
-        this.onSubmitFailure(data.error || "Invalid credentials");
-      }
+      const response = await axios.post(
+        `${process.env.REACT_APP_API_URL}/login`,
+        { email, password },
+        { withCredentials: true }
+      );
+      console.log("Login response:", response.data);
+      localStorage.setItem(
+        "user",
+        JSON.stringify({
+          userId: response.data.userId,
+          username: response.data.username,
+        })
+      );
+      window.location.href = "/";
     } catch (error) {
-      console.error("Login fetch error:", error);
-      this.onSubmitFailure("Network error. Please try again.");
+      console.error("Login error:", error.response?.data || error);
+      this.setState({
+        errorMsg: error.response?.data?.error || "Login failed",
+      });
     }
   };
 
-  renderPasswordField = () => {
-    const { password } = this.state;
-    return (
-      <div className="input-wrapper">
-        <label className="input-label" htmlFor="password">
-          Password
-        </label>
-        <input
-          type="password"
-          id="password"
-          className="input-field"
-          value={password}
-          onChange={this.onChangePassword}
-          placeholder="Enter your password"
-          required
-        />
-      </div>
-    );
-  };
-
-  renderEmailField = () => {
-    const { email } = this.state;
-    return (
-      <div className="input-wrapper">
-        <label className="input-label" htmlFor="email">
-          Email
-        </label>
-        <input
-          type="email"
-          id="email"
-          className="input-field"
-          value={email}
-          onChange={this.onChangeEmail}
-          placeholder="Enter your email"
-          required
-        />
-      </div>
-    );
-  };
+  onChangeEmail = (event) => this.setState({ email: event.target.value });
+  onChangePassword = (event) => this.setState({ password: event.target.value });
 
   render() {
-    const { showSubmitError, errorMsg } = this.state;
-    const jwtToken = Cookies.get("jwt_token");
-    if (jwtToken !== undefined) {
-      return <Redirect to="/" />;
-    }
+    const { email, password, errorMsg } = this.state;
+
     return (
       <div className="login-container">
-        <div className="login-card">
-          <div className="logo-container">
-            <img
-              src="https://cdn-icons-png.flaticon.com/512/2995/2995353.png"
-              className="logo-image"
-              alt="money manager logo"
+        <form className="login-form" onSubmit={this.onSubmitForm}>
+          <h1>Login</h1>
+          <div className="input-group">
+            <label htmlFor="email">Email</label>
+            <input
+              type="email"
+              id="email"
+              value={email}
+              onChange={this.onChangeEmail}
+              className="input-field"
+              placeholder="Enter your email"
+              required
+              autocomplete="email"
             />
-            <h1 className="app-title">Money Manager</h1>
           </div>
-          <form className="login-form" onSubmit={this.submitForm}>
-            {this.renderEmailField()}
-            {this.renderPasswordField()}
-            <button type="submit" className="login-btn">
-              Log In
-            </button>
-            {showSubmitError && (
-              <div className="error-container">
-                <p className="error-msg">{errorMsg}</p>
-                <a href="/register" className="register-link">
-                  Create Account
-                </a>
-              </div>
-            )}
-          </form>
-        </div>
+          <div className="input-group">
+            <label htmlFor="password">Password</label>
+            <input
+              type="password"
+              id="password"
+              value={password}
+              onChange={this.onChangePassword}
+              className="input-field"
+              placeholder="Enter your password"
+              required
+              autocomplete="current-password" // Added
+            />
+          </div>
+          {errorMsg && <p className="error-msg">{errorMsg}</p>}
+          <button type="submit" className="login-btn">
+            Login
+          </button>
+        </form>
       </div>
     );
   }

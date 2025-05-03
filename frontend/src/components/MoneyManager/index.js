@@ -15,9 +15,6 @@ const transactionTypeOptions = [
   { optionId: "EXPENSES", displayText: "Expenses" },
 ];
 
-QrScanner.WORKER_PATH =
-  process.env.PUBLIC_URL + "/qr-scanner/qr-scanner-worker.min.js";
-
 class MoneyManager extends Component {
   state = {
     transactionsList: [],
@@ -27,14 +24,13 @@ class MoneyManager extends Component {
     isScannerActive: false,
     isNightMode: false,
     transactionStatus: null,
-    username: "", // Add username to state
+    username: "",
   };
 
   componentDidMount() {
     this.fetchTransactions();
-    // Load username from localStorage
     const user = JSON.parse(localStorage.getItem("user"));
-    console.log("localStorage user:", user); // Debug log
+    console.log("localStorage user:", user);
     if (user && user.username) {
       this.setState({ username: user.username });
     }
@@ -58,7 +54,7 @@ class MoneyManager extends Component {
         withCredentials: true,
       })
       .then((response) => {
-        console.log("Fetch transactions response:", response.data); // Debug log
+        console.log("Fetch transactions response:", response.data);
         this.setState({ transactionsList: response.data });
       })
       .catch((error) => {
@@ -141,7 +137,7 @@ class MoneyManager extends Component {
         withCredentials: true,
       })
       .then((response) => {
-        console.log("Add expense response:", response.data); // Debug log
+        console.log("Add expense response:", response.data);
         this.fetchTransactions();
         setTimeout(() => this.setState({ transactionStatus: null }), 3000);
       })
@@ -169,7 +165,7 @@ class MoneyManager extends Component {
         withCredentials: true,
       })
       .then((response) => {
-        console.log("Delete response:", response.data); // Debug log
+        console.log("Delete response:", response.data);
         this.setState((prevState) => ({
           transactionsList: prevState.transactionsList.filter(
             (t) => t.transactionId !== transactionId
@@ -190,7 +186,7 @@ class MoneyManager extends Component {
         withCredentials: true,
       })
       .then((response) => {
-        console.log("Clear transactions response:", response.data); // Debug log
+        console.log("Clear transactions response:", response.data);
         this.setState({ transactionsList: [] });
       })
       .catch((error) => {
@@ -215,7 +211,7 @@ class MoneyManager extends Component {
         { withCredentials: true }
       )
       .then((response) => {
-        console.log("Update response:", response.data); // Debug log
+        console.log("Update response:", response.data);
         this.fetchTransactions();
       })
       .catch((error) => {
@@ -251,7 +247,7 @@ class MoneyManager extends Component {
         { withCredentials: true }
       )
       .then((response) => {
-        console.log("Add transaction response:", response.data); // Debug log
+        console.log("Add transaction response:", response.data);
         this.fetchTransactions();
         this.setState({
           titleInput: "",
@@ -299,7 +295,7 @@ class MoneyManager extends Component {
         }
       )
       .then((response) => {
-        console.log("Logout response:", response.data); // Debug log
+        console.log("Logout response:", response.data);
         Cookies.remove("jwt_token");
         window.location.href = "/login";
       })
