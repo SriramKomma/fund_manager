@@ -10,9 +10,7 @@ import "./App.css";
 const App = () => (
   <BrowserRouter>
     <Switch>
-      <Route exact path="/login" component={Login} />
-      <Route exact path="/register" component={Register} />
-      <ProtectedRoute exact path="/" component={MoneyManager} />
+      <Route exact path="/" component={MoneyManager} />
     </Switch>
   </BrowserRouter>
 );
