@@ -23,7 +23,11 @@ app.get("/health", (req, res) => {
 // Middleware
 app.use(
   cors({
-    origin: ["http://localhost:3000", "https://fund-manager-six.vercel.app"],
+    origin: [
+      "http://localhost:3000", 
+      "https://fund-manager-six.vercel.app",
+      "https://moneymanager-1k8t.onrender.com"
+    ],
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
@@ -557,7 +561,10 @@ app.post("/groups", verifyToken, async (req, res) => {
   const userId = req.user.userId;
   const { groupName, monthlyRent, members } = req.body;
 
+  console.log("Create group request:", { groupName, monthlyRent, members, userId });
+
   if (!groupName || !monthlyRent) {
+    console.log("Validation failed: Missing groupName or monthlyRent");
     return res.status(400).json({ error: "Group name and monthly rent are required" });
   }
 
@@ -584,6 +591,8 @@ app.post("/groups", verifyToken, async (req, res) => {
       });
     }
 
+    console.log("Inserting group:", { groupId, groupName, members: groupMembers });
+
     await groupsCollection.insertOne({
       groupId,
       groupName,
@@ -594,10 +603,11 @@ app.post("/groups", verifyToken, async (req, res) => {
       currentMonth: new Date().toISOString().slice(0, 7)
     });
 
+    console.log("Group created successfully:", groupId);
     res.status(201).json({ message: "Group created successfully", groupId });
   } catch (err) {
     console.error("Error creating group:", err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: `Error creating group: ${err.message}` });
   }
 });
 

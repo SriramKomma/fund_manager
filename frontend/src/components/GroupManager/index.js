@@ -71,14 +71,22 @@ class GroupManager extends Component {
     const user = JSON.parse(localStorage.getItem("user")) || {};
     const token = user.token || "";
     
+    if (!newGroup.groupName || !newGroup.monthlyRent) {
+      alert("Please enter group name and monthly rent");
+      return;
+    }
+
     const members = newGroup.members
       .split(",")
       .map(m => m.trim())
       .filter(m => m)
       .map(name => ({ name, userId: null, rentPaid: false, rentPaidDate: null }));
 
+    console.log("Creating group with:", { groupName: newGroup.groupName, monthlyRent: newGroup.monthlyRent, members });
+    console.log("API_URL:", API_URL);
+
     try {
-      await axios.post(`${API_URL}/groups`, {
+      const response = await axios.post(`${API_URL}/groups`, {
         groupName: newGroup.groupName,
         monthlyRent: newGroup.monthlyRent,
         members
@@ -87,11 +95,12 @@ class GroupManager extends Component {
         withCredentials: true,
       });
       
+      console.log("Group created:", response.data);
       this.setState({ showCreateModal: false, newGroup: { groupName: "", monthlyRent: "", members: "" } });
       this.fetchGroups();
     } catch (error) {
-      console.error("Error creating group:", error);
-      alert("Failed to create group");
+      console.error("Error creating group:", error.response?.data || error.message);
+      alert(error.response?.data?.error || "Failed to create group");
     }
   };
 
