@@ -147,7 +147,7 @@ app.post("/login", async (req, res) => {
     }
 
     const token = jwt.sign(
-      { userId: user._id.toString(), email: user.email },
+      { userId: user._id.toString(), email: user.email, username: user.username },
       JWT_SECRET,
       { expiresIn: "1h" }
     );
@@ -575,8 +575,9 @@ app.post("/groups", verifyToken, async (req, res) => {
     // Add owner as first member if not already included
     const ownerExists = groupMembers.some(m => m.userId === userId);
     if (!ownerExists) {
+      const ownerName = req.user.username || req.user.email?.split('@')[0] || "Me";
       groupMembers.unshift({
-        name: req.user.email.split('@')[0],
+        name: ownerName,
         userId: userId,
         rentPaid: false,
         rentPaidDate: null
