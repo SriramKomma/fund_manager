@@ -6,6 +6,7 @@ A full-stack personal finance management application to track income, expenses, 
 
 ## Features
 
+### Personal Mode
 - **User Authentication** - Secure registration and login with JWT tokens
 - **Transaction Management** - Add, edit, and delete income/expense transactions
 - **Financial Overview** - View balance, total income, and total expenses at a glance
@@ -14,6 +15,16 @@ A full-stack personal finance management application to track income, expenses, 
 - **Dark/Light Mode** - Toggle between dark and light themes
 - **Monthly Reset** - Automatic monthly balance carry-forward (cron job)
 - **Responsive Design** - Works on desktop and mobile devices
+
+### Group / PG Mode (Bachelor Room Management)
+- **Multiple Groups** - Create and manage multiple PG/room groups
+- **Member Management** - Add/remove members to groups
+- **Rent Tracking** - Track monthly rent payments per member
+- **Rent Status** - View who has paid rent and who hasn't
+- **Expense Splitting** - Split common expenses equally among members
+- **Balance Summary** - View who owes whom and by how much
+- **Expense History** - Track all group expenses with dates
+- **Monthly Reset** - Reset rent status for new month
 
 ## Tech Stack
 
@@ -168,6 +179,24 @@ The application will open at `http://localhost:3000`
 |--------|----------|-------------|
 | GET | `/generate-pdf` | Download PDF report (protected) |
 
+### Groups (PG/Bachelor Room)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/groups` | Get user's groups |
+| POST | `/groups` | Create new group |
+| GET | `/groups/:groupId` | Get group details |
+| PUT | `/groups/:groupId` | Update group |
+| DELETE | `/groups/:groupId` | Delete group |
+| POST | `/groups/:groupId/members` | Add member to group |
+| DELETE | `/groups/:groupId/members/:name` | Remove member |
+| PUT | `/groups/:groupId/members/:name/rent` | Toggle rent paid status |
+| GET | `/groups/:groupId/expenses` | Get group expenses |
+| POST | `/groups/:groupId/expenses` | Add group expense |
+| DELETE | `/groups/:groupId/expenses/:id` | Delete expense |
+| GET | `/groups/:groupId/balance` | Get balance summary |
+| POST | `/groups/:groupId/reset-rent` | Reset monthly rent |
+
 ## Screenshots
 
 ### Login Page
@@ -190,6 +219,7 @@ The application will open at `http://localhost:3000`
 
 ## Usage
 
+### Personal Mode
 1. **Register** - Create a new account with username, email, and password
 2. **Login** - Use your credentials to log in
 3. **Add Income** - Click "Add Transaction", enter title, amount, select "Income"
@@ -199,6 +229,16 @@ The application will open at `http://localhost:3000`
 7. **Download Report** - Click the download icon to get a PDF of all transactions
 8. **QR Scanner** - Click the QR icon to scan UPI payment codes
 9. **Logout** - Click the logout icon to sign out
+
+### Group/PG Mode
+1. **Choose Mode** - After login, select "Group / PG" mode
+2. **Create Group** - Click "+ Create Group", enter group name, monthly rent, and member names
+3. **View Dashboard** - See rent collection status, pending payments, and member balances
+4. **Track Rent** - Mark rent as paid/unpaid for each member
+5. **Add Expenses** - Click "+ Add Expense" to split bills among members
+6. **View Balances** - See who owes whom and by how much
+7. **Reset Monthly** - Reset rent status for a new month
+8. **Switch Mode** - Go to mode selection to switch between Personal and Group modes
 
 ## Security Features
 
