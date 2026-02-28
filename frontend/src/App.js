@@ -33,6 +33,8 @@ const App = () => {
       <BrowserRouter>
         <Switch>
           <Route exact path="/mode-selection" component={ModeSelection} />
+          <Route exact path="/login" component={Login} />
+          <Route exact path="/register" component={Register} />
           <Redirect to="/mode-selection" />
         </Switch>
       </BrowserRouter>
@@ -53,8 +55,11 @@ const App = () => {
           <ProtectedRoute exact path="/groups" component={GroupManager} />
         )}
         
-        {/* Default redirect based on mode */}
-        <Redirect to={appMode === "personal" ? "/" : "/groups"} />
+        {appMode === "personal" ? (
+          <Redirect to="/" />
+        ) : (
+          <Redirect to="/groups" />
+        )}
       </Switch>
     </BrowserRouter>
   );

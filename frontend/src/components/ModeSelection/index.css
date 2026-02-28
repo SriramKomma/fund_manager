@@ -138,6 +138,24 @@
   margin-bottom: 5px;
 }
 
+.logout-btn-mode {
+  margin-top: 20px;
+  background: #dc3545;
+  color: white;
+  border: none;
+  padding: 12px 30px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+
+.logout-btn-mode:hover {
+  background: #c82333;
+  transform: translateY(-2px);
+}
+
 @media (max-width: 600px) {
   .mode-options {
     flex-direction: column;

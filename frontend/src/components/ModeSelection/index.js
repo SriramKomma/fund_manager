@@ -1,19 +1,25 @@
 import { Component } from "react";
 import { Redirect } from "react-router-dom";
-import axios from "axios";
 import "./index.css";
-
-const API_URL = process.env.REACT_APP_API_URL || "";
 
 class ModeSelection extends Component {
   state = {
-    mode: "",
     redirectTo: null,
   };
 
   selectMode = (mode) => {
     localStorage.setItem("appMode", mode);
-    this.setState({ mode, redirectTo: mode === "personal" ? "/" : "/groups" });
+    if (mode === "personal") {
+      this.setState({ redirectTo: "/" });
+    } else {
+      this.setState({ redirectTo: "/groups" });
+    }
+  };
+
+  logout = () => {
+    localStorage.removeItem("user");
+    localStorage.removeItem("appMode");
+    this.setState({ redirectTo: "/login" });
   };
 
   render() {
@@ -77,6 +83,10 @@ class ModeSelection extends Component {
               </ul>
             </div>
           </div>
+
+          <button className="logout-btn-mode" onClick={this.logout}>
+            Logout
+          </button>
         </div>
       </div>
     );
