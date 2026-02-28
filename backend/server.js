@@ -67,13 +67,18 @@ const verifyToken = (req, res, next) => {
     }
   }
 
+  console.log("verifyToken - Token present:", !!token);
+  console.log("verifyToken - Token value:", token ? token.substring(0, 20) + "..." : "none");
+  console.log("verifyToken - JWT_SECRET:", JWT_SECRET);
+
   if (!token) return res.status(401).json({ error: "Unauthorized, No Token" });
 
   jwt.verify(token, JWT_SECRET, (err, decoded) => {
     if (err) {
-      console.error("Token verification failed:", err);
+      console.error("Token verification failed:", err.message);
       return res.status(401).json({ error: "Unauthorized, Invalid Token" });
     }
+    console.log("Token decoded successfully:", decoded);
     req.user = decoded;
     next();
   });
