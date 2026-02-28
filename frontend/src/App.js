@@ -3,20 +3,58 @@ import { BrowserRouter, Route, Switch, Redirect } from "react-router-dom";
 import Login from "./components/Login";
 import Register from "./components/Register";
 import MoneyManager from "./components/MoneyManager";
+import ModeSelection from "./components/ModeSelection";
+import GroupManager from "./components/GroupManager";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 import "./App.css";
 
 const App = () => {
-  const isAuthenticated = !!JSON.parse(localStorage.getItem("user"))?.token;
+  const user = JSON.parse(localStorage.getItem("user"));
+  const isAuthenticated = !!user?.token;
+  const appMode = localStorage.getItem("appMode");
 
+  // If not authenticated, go to login
+  if (!isAuthenticated) {
+    return (
+      <BrowserRouter>
+        <Switch>
+          <Route exact path="/login" component={Login} />
+          <Route exact path="/register" component={Register} />
+          <Redirect to="/login" />
+        </Switch>
+      </BrowserRouter>
+    );
+  }
+
+  // If authenticated but no mode selected, go to mode selection
+  if (!appMode) {
+    return (
+      <BrowserRouter>
+        <Switch>
+          <Route exact path="/mode-selection" component={ModeSelection} />
+          <Redirect to="/mode-selection" />
+        </Switch>
+      </BrowserRouter>
+    );
+  }
+
+  // If authenticated with mode, route based on mode
   return (
     <BrowserRouter>
       <Switch>
         <Route exact path="/login" component={Login} />
         <Route exact path="/register" component={Register} />
-        <ProtectedRoute exact path="/" component={MoneyManager} />
-        {isAuthenticated ? <Redirect to="/" /> : <Redirect to="/login" />}
+        <Route exact path="/mode-selection" component={ModeSelection} />
+        
+        {appMode === "personal" ? (
+          <ProtectedRoute exact path="/" component={MoneyManager} />
+        ) : (
+          <ProtectedRoute exact path="/groups" component={GroupManager} />
+        )}
+        
+        {/* Default redirect based on mode */}
+        <Redirect to={appMode === "personal" ? "/" : "/groups"} />
       </Switch>
     </BrowserRouter>
   );

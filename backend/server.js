@@ -534,3 +534,465 @@ app.get("/generate-pdf", verifyToken, async (req, res) => {
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
+
+// ==================== GROUP MANAGEMENT API ====================
+
+// Get user's groups
+app.get("/groups", verifyToken, async (req, res) => {
+  const userId = req.user.userId;
+  try {
+    const groupsCollection = db.collection("groups");
+    const groups = await groupsCollection.find({ 
+      $or: [{ ownerId: userId }, { "members.userId": userId }] 
+    }).toArray();
+    res.json(groups);
+  } catch (err) {
+    console.error("Error fetching groups:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Create new group
+app.post("/groups", verifyToken, async (req, res) => {
+  const userId = req.user.userId;
+  const { groupName, monthlyRent, members } = req.body;
+
+  if (!groupName || !monthlyRent) {
+    return res.status(400).json({ error: "Group name and monthly rent are required" });
+  }
+
+  try {
+    const groupsCollection = db.collection("groups");
+    const groupId = uuidv4();
+    
+    const groupMembers = members?.map(m => ({
+      ...m,
+      userId: m.userId || null,
+      rentPaid: false,
+      rentPaidDate: null
+    })) || [];
+
+    // Add owner as first member if not already included
+    const ownerExists = groupMembers.some(m => m.userId === userId);
+    if (!ownerExists) {
+      groupMembers.unshift({
+        name: req.user.email.split('@')[0],
+        userId: userId,
+        rentPaid: false,
+        rentPaidDate: null
+      });
+    }
+
+    await groupsCollection.insertOne({
+      groupId,
+      groupName,
+      monthlyRent: parseInt(monthlyRent),
+      ownerId: userId,
+      members: groupMembers,
+      createdAt: new Date().toISOString(),
+      currentMonth: new Date().toISOString().slice(0, 7)
+    });
+
+    res.status(201).json({ message: "Group created successfully", groupId });
+  } catch (err) {
+    console.error("Error creating group:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get group details
+app.get("/groups/:groupId", verifyToken, async (req, res) => {
+  const { groupId } = req.params;
+  const userId = req.user.userId;
+
+  try {
+    const groupsCollection = db.collection("groups");
+    const group = await groupsCollection.findOne({ groupId });
+
+    if (!group) {
+      return res.status(404).json({ error: "Group not found" });
+    }
+
+    // Check if user is member or owner
+    const isMember = group.members.some(m => m.userId === userId) || group.ownerId === userId;
+    if (!isMember) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    res.json(group);
+  } catch (err) {
+    console.error("Error fetching group:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update group
+app.put("/groups/:groupId", verifyToken, async (req, res) => {
+  const { groupId } = req.params;
+  const userId = req.user.userId;
+  const { groupName, monthlyRent, members } = req.body;
+
+  try {
+    const groupsCollection = db.collection("groups");
+    const group = await groupsCollection.findOne({ groupId });
+
+    if (!group) {
+      return res.status(404).json({ error: "Group not found" });
+    }
+
+    if (group.ownerId !== userId) {
+      return res.status(403).json({ error: "Only owner can update group" });
+    }
+
+    await groupsCollection.updateOne(
+      { groupId },
+      { $set: { 
+        groupName: groupName || group.groupName,
+        monthlyRent: monthlyRent ? parseInt(monthlyRent) : group.monthlyRent,
+        members: members || group.members
+      }}
+    );
+
+    res.json({ message: "Group updated successfully" });
+  } catch (err) {
+    console.error("Error updating group:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Delete group
+app.delete("/groups/:groupId", verifyToken, async (req, res) => {
+  const { groupId } = req.params;
+  const userId = req.user.userId;
+
+  try {
+    const groupsCollection = db.collection("groups");
+    const group = await groupsCollection.findOne({ groupId });
+
+    if (!group) {
+      return res.status(404).json({ error: "Group not found" });
+    }
+
+    if (group.ownerId !== userId) {
+      return res.status(403).json({ error: "Only owner can delete group" });
+    }
+
+    await groupsCollection.deleteOne({ groupId });
+    // Also delete group expenses
+    const expensesCollection = db.collection("groupExpenses");
+    await expensesCollection.deleteMany({ groupId });
+
+    res.json({ message: "Group deleted successfully" });
+  } catch (err) {
+    console.error("Error deleting group:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Add member to group
+app.post("/groups/:groupId/members", verifyToken, async (req, res) => {
+  const { groupId } = req.params;
+  const userId = req.user.userId;
+  const { name } = req.body;
+
+  if (!name) {
+    return res.status(400).json({ error: "Member name is required" });
+  }
+
+  try {
+    const groupsCollection = db.collection("groups");
+    const group = await groupsCollection.findOne({ groupId });
+
+    if (!group) {
+      return res.status(404).json({ error: "Group not found" });
+    }
+
+    if (group.ownerId !== userId) {
+      return res.status(403).json({ error: "Only owner can add members" });
+    }
+
+    const newMember = {
+      name,
+      userId: null,
+      rentPaid: false,
+      rentPaidDate: null
+    };
+
+    await groupsCollection.updateOne(
+      { groupId },
+      { $push: { members: newMember } }
+    );
+
+    res.status(201).json({ message: "Member added successfully" });
+  } catch (err) {
+    console.error("Error adding member:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Remove member from group
+app.delete("/groups/:groupId/members/:memberName", verifyToken, async (req, res) => {
+  const { groupId, memberName } = req.params;
+  const userId = req.user.userId;
+
+  try {
+    const groupsCollection = db.collection("groups");
+    const group = await groupsCollection.findOne({ groupId });
+
+    if (!group) {
+      return res.status(404).json({ error: "Group not found" });
+    }
+
+    if (group.ownerId !== userId) {
+      return res.status(403).json({ error: "Only owner can remove members" });
+    }
+
+    await groupsCollection.updateOne(
+      { groupId },
+      { $pull: { members: { name: memberName } } }
+    );
+
+    res.json({ message: "Member removed successfully" });
+  } catch (err) {
+    console.error("Error removing member:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Mark rent as paid/unpaid
+app.put("/groups/:groupId/members/:memberName/rent", verifyToken, async (req, res) => {
+  const { groupId, memberName } = req.params;
+  const userId = req.user.userId;
+  const { rentPaid } = req.body;
+
+  try {
+    const groupsCollection = db.collection("groups");
+    const group = await groupsCollection.findOne({ groupId });
+
+    if (!group) {
+      return res.status(404).json({ error: "Group not found" });
+    }
+
+    const isMember = group.members.some(m => m.name === memberName && m.userId === userId);
+    const isOwner = group.ownerId === userId;
+    
+    if (!isMember && !isOwner) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    await groupsCollection.updateOne(
+      { groupId, "members.name": memberName },
+      { $set: { 
+        "members.$.rentPaid": rentPaid,
+        "members.$.rentPaidDate": rentPaid ? new Date().toISOString() : null
+      }}
+    );
+
+    res.json({ message: `Rent marked as ${rentPaid ? 'paid' : 'unpaid'}` });
+  } catch (err) {
+    console.error("Error updating rent status:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get group expenses
+app.get("/groups/:groupId/expenses", verifyToken, async (req, res) => {
+  const { groupId } = req.params;
+  const userId = req.user.userId;
+
+  try {
+    const groupsCollection = db.collection("groups");
+    const group = await groupsCollection.findOne({ groupId });
+
+    if (!group) {
+      return res.status(404).json({ error: "Group not found" });
+    }
+
+    const isMember = group.members.some(m => m.userId === userId) || group.ownerId === userId;
+    if (!isMember) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    const expensesCollection = db.collection("groupExpenses");
+    const expenses = await expensesCollection.find({ groupId }).sort({ date: -1 }).toArray();
+    res.json(expenses);
+  } catch (err) {
+    console.error("Error fetching group expenses:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Add group expense
+app.post("/groups/:groupId/expenses", verifyToken, async (req, res) => {
+  const { groupId } = req.params;
+  const userId = req.user.userId;
+  const { title, amount, paidBy, splitBetween, type } = req.body;
+
+  if (!title || !amount || !paidBy) {
+    return res.status(400).json({ error: "Title, amount and payer are required" });
+  }
+
+  try {
+    const groupsCollection = db.collection("groups");
+    const group = await groupsCollection.findOne({ groupId });
+
+    if (!group) {
+      return res.status(404).json({ error: "Group not found" });
+    }
+
+    const isMember = group.members.some(m => m.userId === userId) || group.ownerId === userId;
+    if (!isMember) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    const expenseId = uuidv4();
+    const expensesCollection = db.collection("groupExpenses");
+    
+    await expensesCollection.insertOne({
+      expenseId,
+      groupId,
+      title,
+      amount: parseInt(amount),
+      paidBy,
+      splitBetween: splitBetween || group.members.map(m => m.name),
+      type: type || "Common",
+      date: new Date().toISOString().split("T")[0],
+      createdAt: new Date().toISOString()
+    });
+
+    res.status(201).json({ message: "Expense added successfully", expenseId });
+  } catch (err) {
+    console.error("Error adding group expense:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Delete group expense
+app.delete("/groups/:groupId/expenses/:expenseId", verifyToken, async (req, res) => {
+  const { groupId, expenseId } = req.params;
+  const userId = req.user.userId;
+
+  try {
+    const groupsCollection = db.collection("groups");
+    const group = await groupsCollection.findOne({ groupId });
+
+    if (!group) {
+      return res.status(404).json({ error: "Group not found" });
+    }
+
+    const isMember = group.members.some(m => m.userId === userId) || group.ownerId === userId;
+    if (!isMember) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    const expensesCollection = db.collection("groupExpenses");
+    await expensesCollection.deleteOne({ expenseId, groupId });
+
+    res.json({ message: "Expense deleted successfully" });
+  } catch (err) {
+    console.error("Error deleting group expense:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get group balance summary
+app.get("/groups/:groupId/balance", verifyToken, async (req, res) => {
+  const { groupId } = req.params;
+  const userId = req.user.userId;
+
+  try {
+    const groupsCollection = db.collection("groups");
+    const group = await groupsCollection.findOne({ groupId });
+
+    if (!group) {
+      return res.status(404).json({ error: "Group not found" });
+    }
+
+    const isMember = group.members.some(m => m.userId === userId) || group.ownerId === userId;
+    if (!isMember) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    const expensesCollection = db.collection("groupExpenses");
+    const expenses = await expensesCollection.find({ groupId }).toArray();
+
+    // Calculate balance for each member
+    const balances = {};
+    group.members.forEach(m => {
+      balances[m.name] = {
+        name: m.name,
+        totalPaid: 0,
+        owes: 0,
+        rentPaid: m.rentPaid,
+        rentAmount: group.monthlyRent
+      };
+    });
+
+    expenses.forEach(exp => {
+      if (balances[exp.paidBy]) {
+        balances[exp.paidBy].totalPaid += exp.amount;
+      }
+      
+      const splitAmount = exp.amount / exp.splitBetween.length;
+      exp.splitBetween.forEach(name => {
+        if (balances[name]) {
+          balances[name].owes += splitAmount;
+        }
+      });
+    });
+
+    // Calculate net balance
+    Object.keys(balances).forEach(name => {
+      balances[name].netBalance = balances[name].totalPaid - balances[name].owes;
+    });
+
+    // Calculate rent collection
+    const rentCollected = group.members.filter(m => m.rentPaid).length * group.monthlyRent;
+    const rentPending = (group.members.length - group.members.filter(m => m.rentPaid).length) * group.monthlyRent;
+
+    res.json({
+      balances: Object.values(balances),
+      rentCollected,
+      rentPending,
+      totalMembers: group.members.length,
+      monthlyRent: group.monthlyRent
+    });
+  } catch (err) {
+    console.error("Error calculating balance:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Reset monthly rent status
+app.post("/groups/:groupId/reset-rent", verifyToken, async (req, res) => {
+  const { groupId } = req.params;
+  const userId = req.user.userId;
+
+  try {
+    const groupsCollection = db.collection("groups");
+    const group = await groupsCollection.findOne({ groupId });
+
+    if (!group) {
+      return res.status(404).json({ error: "Group not found" });
+    }
+
+    if (group.ownerId !== userId) {
+      return res.status(403).json({ error: "Only owner can reset rent" });
+    }
+
+    // Reset all members' rent status
+    await groupsCollection.updateOne(
+      { groupId },
+      { $set: { 
+        "members.$[].rentPaid": false,
+        "members.$[].rentPaidDate": null,
+        currentMonth: new Date().toISOString().slice(0, 7)
+      }}
+    );
+
+    res.json({ message: "Rent status reset for new month" });
+  } catch (err) {
+    console.error("Error resetting rent:", err);
+    res.status(500).json({ error: err.message });
+  }
+});

@@ -29,8 +29,9 @@ class Login extends Component {
       token: data.token,
     };
     console.log("Saving to localStorage:", userData);
+    localStorage.removeItem("appMode"); // Clear previous mode selection
     localStorage.setItem("user", JSON.stringify(userData));
-    history.replace("/");
+    history.replace("/mode-selection");
   };
 
   onSubmitFailure = (errorMsg) => {
