@@ -533,6 +533,14 @@
   border-left: 4px solid #4CAF50;
 }
 
+.member-card.positive {
+  border-left: 4px solid #4CAF50;
+}
+
+.member-card.negative {
+  border-left: 4px solid #f44336;
+}
+
 .member-card.pending {
   border-left: 4px solid #f44336;
 }
@@ -591,6 +599,162 @@
 
 .rent-badge.paid {
   background: #4CAF50;
+}
+
+.member-stats {
+  display: flex;
+  gap: 20px;
+  text-align: right;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-item .label {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.stat-item .value {
+  font-size: 16px;
+  font-weight: 600;
+  color: white;
+}
+
+.stat-item .value.positive {
+  color: #4CAF50;
+}
+
+.stat-item .value.negative {
+  color: #f44336;
+}
+
+.settlements-section {
+  margin-top: 30px;
+}
+
+.settlements-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settlement-item {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 15px 20px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.settlement-item .from {
+  color: #f44336;
+  font-weight: 600;
+}
+
+.settlement-item .arrow {
+  color: white;
+  font-size: 20px;
+}
+
+.settlement-item .to {
+  color: #4CAF50;
+  font-weight: 600;
+}
+
+.settlement-item .amount {
+  margin-left: auto;
+  color: white;
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.settle-content {
+  padding: 30px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.settlements-full {
+  margin-bottom: 30px;
+}
+
+.settlements-full h3 {
+  color: white;
+  margin-bottom: 20px;
+}
+
+.settlement-card {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 25px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 15px;
+}
+
+.settlement-person {
+  text-align: center;
+}
+
+.settlement-person .avatar {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 700;
+  margin: 0 auto 10px;
+}
+
+.settlement-person span {
+  color: white;
+}
+
+.settlement-arrow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.settlement-arrow .amount {
+  color: #667eea;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.settlement-arrow .arrow {
+  font-size: 24px;
+}
+
+.no-settlements {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.no-settlements .empty-icon {
+  font-size: 80px;
+}
+
+.no-settlements h3 {
+  color: white;
+  margin: 20px 0 10px;
+}
+
+.no-settlements p {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.settle-actions {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
 }
 
 .toggle-btn {

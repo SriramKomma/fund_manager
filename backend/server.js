@@ -564,24 +564,25 @@ app.get("/groups", verifyToken, async (req, res) => {
 // Create new group
 app.post("/groups", verifyToken, async (req, res) => {
   const userId = req.user.userId;
-  const { groupName, monthlyRent, members } = req.body;
+  const { groupName, monthlyContribution, members } = req.body;
 
-  console.log("Create group request:", { groupName, monthlyRent, members, userId });
+  console.log("Create group request:", { groupName, monthlyContribution, members, userId });
 
-  if (!groupName || !monthlyRent) {
-    console.log("Validation failed: Missing groupName or monthlyRent");
-    return res.status(400).json({ error: "Group name and monthly rent are required" });
+  if (!groupName) {
+    console.log("Validation failed: Missing groupName");
+    return res.status(400).json({ error: "Group name is required" });
   }
 
   try {
     const groupsCollection = db.collection("groups");
     const groupId = uuidv4();
     
+    // Initialize each member with 0 balance
     const groupMembers = members?.map(m => ({
       ...m,
       userId: m.userId || null,
-      rentPaid: false,
-      rentPaidDate: null
+      balance: 0,
+      totalPaid: 0
     })) || [];
 
     // Add owner as first member if not already included
@@ -591,8 +592,8 @@ app.post("/groups", verifyToken, async (req, res) => {
       groupMembers.unshift({
         name: ownerName,
         userId: userId,
-        rentPaid: false,
-        rentPaidDate: null
+        balance: 0,
+        totalPaid: 0
       });
     }
 
@@ -601,7 +602,7 @@ app.post("/groups", verifyToken, async (req, res) => {
     await groupsCollection.insertOne({
       groupId,
       groupName,
-      monthlyRent: parseInt(monthlyRent),
+      monthlyContribution: parseInt(monthlyContribution) || 0,
       ownerId: userId,
       members: groupMembers,
       createdAt: new Date().toISOString(),
@@ -932,50 +933,169 @@ app.get("/groups/:groupId/balance", verifyToken, async (req, res) => {
     const expensesCollection = db.collection("groupExpenses");
     const expenses = await expensesCollection.find({ groupId }).toArray();
 
-    // Calculate balance for each member
+    // Initialize balances
     const balances = {};
     group.members.forEach(m => {
       balances[m.name] = {
         name: m.name,
-        totalPaid: 0,
-        owes: 0,
-        rentPaid: m.rentPaid,
-        rentAmount: group.monthlyRent
+        totalPaid: m.totalPaid || 0,
+        balance: m.balance || 0
       };
     });
 
+    // Calculate balances from expenses
     expenses.forEach(exp => {
       if (balances[exp.paidBy]) {
         balances[exp.paidBy].totalPaid += exp.amount;
+        balances[exp.paidBy].balance += exp.amount;
       }
       
       const splitAmount = exp.amount / exp.splitBetween.length;
       exp.splitBetween.forEach(name => {
         if (balances[name]) {
-          balances[name].owes += splitAmount;
+          balances[name].balance -= splitAmount;
         }
       });
     });
 
-    // Calculate net balance
-    Object.keys(balances).forEach(name => {
-      balances[name].netBalance = balances[name].totalPaid - balances[name].owes;
+    // Calculate settlements between members
+    const settlements = [];
+    const positive = [];
+    const negative = [];
+
+    Object.values(balances).forEach(b => {
+      if (b.balance > 0) positive.push(b);
+      if (b.balance < 0) negative.push(b);
     });
 
-    // Calculate rent collection
-    const rentCollected = group.members.filter(m => m.rentPaid).length * group.monthlyRent;
-    const rentPending = (group.members.length - group.members.filter(m => m.rentPaid).length) * group.monthlyRent;
+    positive.sort((a, b) => b.balance - a.balance);
+    negative.sort((a, b) => a.balance - b.balance);
+
+    let i = 0, j = 0;
+    while (i < positive.length && j < negative.length) {
+      const from = negative[j];
+      const to = positive[i];
+      const amount = Math.min(-from.balance, to.balance);
+      
+      if (amount > 0) {
+        settlements.push({
+          from: from.name,
+          to: to.name,
+          amount: Math.round(amount)
+        });
+      }
+      
+      from.balance += amount;
+      to.balance -= amount;
+      
+      if (from.balance >= 0) j++;
+      if (to.balance <= 0) i++;
+    }
 
     res.json({
       balances: Object.values(balances),
-      rentCollected,
-      rentPending,
+      settlements,
+      totalExpenses: expenses.reduce((sum, e) => sum + e.amount, 0),
       totalMembers: group.members.length,
-      monthlyRent: group.monthlyRent
+      monthlyContribution: group.monthlyContribution || 0
     });
   } catch (err) {
     console.error("Error calculating balance:", err);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// Make a payment from one member to another
+app.post("/groups/:groupId/pay", verifyToken, async (req, res) => {
+  const { groupId } = req.params;
+  const userId = req.user.userId;
+  const { from, to, amount, note } = req.body;
+
+  if (!from || !to || !amount) {
+    return res.status(400).json({ error: "From, to and amount are required" });
+  }
+
+  try {
+    const groupsCollection = db.collection("groups");
+    const group = await groupsCollection.findOne({ groupId });
+
+    if (!group) {
+      return res.status(404).json({ error: "Group not found" });
+    }
+
+    const isMember = group.members.some(m => m.userId === userId) || group.ownerId === userId;
+    if (!isMember) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    const paymentId = uuidv4();
+    const expensesCollection = db.collection("groupExpenses");
+    
+    // Record the payment as an expense
+    await expensesCollection.insertOne({
+      expenseId: paymentId,
+      groupId,
+      title: note || `Payment from ${from} to ${to}`,
+      amount: parseInt(amount),
+      paidBy: from,
+      splitBetween: [to],  // Only the receiver benefits
+      type: "Payment",
+      date: new Date().toISOString().split("T")[0],
+      createdAt: new Date().toISOString()
+    });
+
+    res.status(201).json({ message: "Payment recorded successfully", paymentId });
+  } catch (err) {
+    console.error("Error making payment:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Add money to group (member pays their share)
+app.post("/groups/:groupId/add-money", verifyToken, async (req, res) => {
+  const { groupId } = req.params;
+  const userId = req.user.userId;
+  const { memberName, amount, note } = req.body;
+
+  if (!memberName || !amount) {
+    return res.status(400).json({ error: "Member name and amount are required" });
+  }
+
+  try {
+    const groupsCollection = db.collection("groups");
+    const group = await groupsCollection.findOne({ groupId });
+
+    if (!group) {
+      return res.status(404).json({ error: "Group not found" });
+    }
+
+    const isMember = group.members.some(m => m.userId === userId) || group.ownerId === userId;
+    if (!isMember) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    const paymentId = uuidv4();
+    const expensesCollection = db.collection("groupExpenses");
+    
+    // Record the payment - split among all members equally
+    await expensesCollection.insertOne({
+      expenseId: paymentId,
+      groupId,
+      title: note || `${memberName} added money`,
+      amount: parseInt(amount),
+      paidBy: memberName,
+      splitBetween: group.members.map(m => m.name),  // Everyone owes their share
+      type: "Payment",
+      date: new Date().toISOString().split("T")[0],
+      createdAt: new Date().toISOString()
+    });
+
+    res.status(201).json({ message: "Money added successfully", paymentId });
+  } catch (err) {
+    console.error("Error adding money:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
   }
 });
 
@@ -1009,6 +1129,43 @@ app.post("/groups/:groupId/reset-rent", verifyToken, async (req, res) => {
     res.json({ message: "Rent status reset for new month" });
   } catch (err) {
     console.error("Error resetting rent:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Reset all balances in a group
+app.post("/groups/:groupId/reset-balances", verifyToken, async (req, res) => {
+  const { groupId } = req.params;
+  const userId = req.user.userId;
+
+  try {
+    const groupsCollection = db.collection("groups");
+    const group = await groupsCollection.findOne({ groupId });
+
+    if (!group) {
+      return res.status(404).json({ error: "Group not found" });
+    }
+
+    if (group.ownerId !== userId) {
+      return res.status(403).json({ error: "Only owner can reset balances" });
+    }
+
+    // Reset all members' balance and totalPaid
+    await groupsCollection.updateOne(
+      { groupId },
+      { $set: { 
+        "members.$[].balance": 0,
+        "members.$[].totalPaid": 0
+      }}
+    );
+
+    // Delete all expenses
+    const expensesCollection = db.collection("groupExpenses");
+    await expensesCollection.deleteMany({ groupId });
+
+    res.json({ message: "All balances reset successfully" });
+  } catch (err) {
+    console.error("Error resetting balances:", err);
     res.status(500).json({ error: err.message });
   }
 });

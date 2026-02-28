@@ -6,14 +6,13 @@ import "./index.css";
 const API_URL = process.env.REACT_APP_API_URL || "";
 
 const EXPENSE_CATEGORIES = [
-  { id: "rent", name: "Rent", icon: "🏠" },
   { id: "groceries", name: "Groceries", icon: "🛒" },
   { id: "electricity", name: "Electricity", icon: "💡" },
   { id: "wifi", name: "WiFi", icon: "📶" },
   { id: "cooking", name: "Cooking/Gas", icon: "🔥" },
-  { id: "cleaning", name: "Cleaning", icon: "🧹" },
-  { id: "utensils", name: "Utensils", icon: "🍳" },
+  { id: "rent", name: "Rent", icon: "🏠" },
   { id: "maintenance", name: "Maintenance", icon: "🔧" },
+  { id: "food", name: "Food", icon: "🍕" },
   { id: "other", name: "Other", icon: "📦" },
 ];
 
@@ -28,10 +27,12 @@ class GroupManager extends Component {
     selectedGroup: null,
     showCreateModal: false,
     showExpenseModal: false,
-    showSettleModal: false,
-    newGroup: { groupName: "", monthlyRent: "", members: "" },
+    showPaymentModal: false,
+    showAddMoneyModal: false,
+    newGroup: { groupName: "", monthlyContribution: "", members: "" },
     newExpense: { title: "", amount: "", paidBy: "", category: "other" },
-    settleExpense: { paidBy: "", paidTo: "", amount: "" },
+    newPayment: { from: "", to: "", amount: "", note: "" },
+    addMoney: { memberName: "", amount: "", note: "" },
     balance: null,
     expenses: [],
     loading: true,
@@ -90,8 +91,8 @@ class GroupManager extends Component {
     const user = JSON.parse(localStorage.getItem("user")) || {};
     const token = user.token || "";
     
-    if (!newGroup.groupName || !newGroup.monthlyRent) {
-      alert("Please enter group name and monthly rent");
+    if (!newGroup.groupName) {
+      alert("Please enter group name");
       return;
     }
 
@@ -99,19 +100,19 @@ class GroupManager extends Component {
       .split(",")
       .map(m => m.trim())
       .filter(m => m)
-      .map(name => ({ name, userId: null, rentPaid: false, rentPaidDate: null }));
+      .map(name => ({ name, userId: null, balance: 0, totalPaid: 0 }));
 
     try {
       await axios.post(`${API_URL}/groups`, {
         groupName: newGroup.groupName,
-        monthlyRent: newGroup.monthlyRent,
+        monthlyContribution: newGroup.monthlyContribution || 0,
         members
       }, {
         headers: { Authorization: token ? `Bearer ${token}` : "" },
         withCredentials: true,
       });
       
-      this.setState({ showCreateModal: false, newGroup: { groupName: "", monthlyRent: "", members: "" } });
+      this.setState({ showCreateModal: false, newGroup: { groupName: "", monthlyContribution: "", members: "" } });
       this.fetchGroups();
     } catch (error) {
       console.error("Error creating group:", error.response?.data || error.message);
@@ -147,22 +148,60 @@ class GroupManager extends Component {
     }
   };
 
-  toggleRentStatus = async (memberName, currentStatus) => {
-    const { selectedGroup } = this.state;
+  makePayment = async () => {
+    const { newPayment, selectedGroup } = this.state;
     const user = JSON.parse(localStorage.getItem("user")) || {};
     const token = user.token || "";
 
+    if (!newPayment.from || !newPayment.to || !newPayment.amount) {
+      alert("Please fill all fields");
+      return;
+    }
+
     try {
-      await axios.put(`${API_URL}/groups/${selectedGroup.groupId}/members/${memberName}/rent`, {
-        rentPaid: !currentStatus
+      await axios.post(`${API_URL}/groups/${selectedGroup.groupId}/pay`, {
+        from: newPayment.from,
+        to: newPayment.to,
+        amount: parseInt(newPayment.amount),
+        note: newPayment.note
       }, {
         headers: { Authorization: token ? `Bearer ${token}` : "" },
         withCredentials: true,
       });
       
+      this.setState({ showPaymentModal: false, newPayment: { from: "", to: "", amount: "", note: "" } });
       this.selectGroup(selectedGroup);
     } catch (error) {
-      console.error("Error updating rent status:", error);
+      console.error("Error making payment:", error);
+      alert("Failed to make payment");
+    }
+  };
+
+  addGroupMoney = async () => {
+    const { addMoney, selectedGroup } = this.state;
+    const user = JSON.parse(localStorage.getItem("user")) || {};
+    const token = user.token || "";
+
+    if (!addMoney.memberName || !addMoney.amount) {
+      alert("Please fill all fields");
+      return;
+    }
+
+    try {
+      await axios.post(`${API_URL}/groups/${selectedGroup.groupId}/add-money`, {
+        memberName: addMoney.memberName,
+        amount: parseInt(addMoney.amount),
+        note: addMoney.note
+      }, {
+        headers: { Authorization: token ? `Bearer ${token}` : "" },
+        withCredentials: true,
+      });
+      
+      this.setState({ showAddMoneyModal: false, addMoney: { memberName: "", amount: "", note: "" } });
+      this.selectGroup(selectedGroup);
+    } catch (error) {
+      console.error("Error adding money:", error);
+      alert("Failed to add money");
     }
   };
 
@@ -182,21 +221,21 @@ class GroupManager extends Component {
     }
   };
 
-  resetRent = async () => {
+  resetBalances = async () => {
     const { selectedGroup } = this.state;
     const user = JSON.parse(localStorage.getItem("user")) || {};
     const token = user.token || "";
 
-    if (!window.confirm("Are you sure you want to reset rent status for all members?")) return;
+    if (!window.confirm("Are you sure you want to reset all balances to zero?")) return;
 
     try {
-      await axios.post(`${API_URL}/groups/${selectedGroup.groupId}/reset-rent`, {}, {
+      await axios.post(`${API_URL}/groups/${selectedGroup.groupId}/reset-balances`, {}, {
         headers: { Authorization: token ? `Bearer ${token}` : "" },
         withCredentials: true,
       });
       this.selectGroup(selectedGroup);
     } catch (error) {
-      console.error("Error resetting rent:", error);
+      console.error("Error resetting balances:", error);
     }
   };
 
@@ -223,8 +262,8 @@ class GroupManager extends Component {
 
   render() {
     const { 
-      groups, selectedGroup, showCreateModal, showExpenseModal, 
-      newGroup, newExpense, balance, expenses, loading, activeTab, redirectTo 
+      groups, selectedGroup, showCreateModal, showExpenseModal, showPaymentModal, showAddMoneyModal,
+      newGroup, newExpense, newPayment, addMoney, balance, expenses, loading, activeTab, redirectTo 
     } = this.state;
 
     if (redirectTo) {
@@ -242,7 +281,7 @@ class GroupManager extends Component {
           <div className="group-list-header">
             <div>
               <h1>My Groups</h1>
-              <p className="subtitle">Manage your PG/Bachelor room expenses</p>
+              <p className="subtitle">Track shared expenses with roommates</p>
             </div>
             <button className="btn-primary" onClick={() => this.setState({ showCreateModal: true })}>
               <span>+</span> Create Group
@@ -251,7 +290,7 @@ class GroupManager extends Component {
 
           {groups.length === 0 ? (
             <div className="no-groups">
-              <div className="empty-icon">🏠</div>
+              <div className="empty-icon">👥</div>
               <h3>No groups yet</h3>
               <p>Create your first group to start tracking shared expenses!</p>
               <button className="btn-primary" onClick={() => this.setState({ showCreateModal: true })}>
@@ -263,7 +302,7 @@ class GroupManager extends Component {
               {groups.map((group, index) => (
                 <div key={group.groupId} className="group-card" onClick={() => this.selectGroup(group)}>
                   <div className="group-card-header" style={{ background: this.getMemberColor(index) }}>
-                    <span className="group-emoji">🏠</span>
+                    <span className="group-emoji">👥</span>
                   </div>
                   <div className="group-card-body">
                     <h3>{group.groupName}</h3>
@@ -273,20 +312,9 @@ class GroupManager extends Component {
                         <span className="stat-label">Members</span>
                       </div>
                       <div className="stat">
-                        <span className="stat-value">₹{group.monthlyRent}</span>
-                        <span className="stat-label">Rent</span>
+                        <span className="stat-value">₹{group.monthlyContribution || 0}</span>
+                        <span className="stat-label">Monthly</span>
                       </div>
-                    </div>
-                    <div className="rent-progress">
-                      <div className="progress-bar">
-                        <div 
-                          className="progress-fill" 
-                          style={{ width: `${(group.members.filter(m => m.rentPaid).length / group.members.length) * 100}%` }}
-                        ></div>
-                      </div>
-                      <span className="progress-text">
-                        {group.members.filter(m => m.rentPaid).length}/{group.members.length} paid rent
-                      </span>
                     </div>
                   </div>
                 </div>
@@ -306,18 +334,18 @@ class GroupManager extends Component {
                     <label>Group Name</label>
                     <input
                       type="text"
-                      placeholder="e.g., PG Room - 204, Hostel A"
+                      placeholder="e.g., Room 204, Hostel A"
                       value={newGroup.groupName}
                       onChange={e => this.setState({ newGroup: { ...newGroup, groupName: e.target.value } })}
                     />
                   </div>
                   <div className="form-group">
-                    <label>Monthly Rent (per person)</label>
+                    <label>Monthly Contribution (optional)</label>
                     <input
                       type="number"
                       placeholder="e.g., 5000"
-                      value={newGroup.monthlyRent}
-                      onChange={e => this.setState({ newGroup: { ...newGroup, monthlyRent: e.target.value } })}
+                      value={newGroup.monthlyContribution}
+                      onChange={e => this.setState({ newGroup: { ...newGroup, monthlyContribution: e.target.value } })}
                     />
                   </div>
                   <div className="form-group">
@@ -359,7 +387,7 @@ class GroupManager extends Component {
             className={`tab ${activeTab === "dashboard" ? "active" : ""}`}
             onClick={() => this.setState({ activeTab: "dashboard" })}
           >
-            💰 Dashboard
+            💰 Balances
           </button>
           <button 
             className={`tab ${activeTab === "expenses" ? "active" : ""}`}
@@ -368,46 +396,28 @@ class GroupManager extends Component {
             📋 Expenses
           </button>
           <button 
-            className={`tab ${activeTab === "members" ? "active" : ""}`}
-            onClick={() => this.setState({ activeTab: "members" })}
+            className={`tab ${activeTab === "settle" ? "active" : ""}`}
+            onClick={() => this.setState({ activeTab: "settle" })}
           >
-            👥 Members
+            🤝 Settle Up
           </button>
         </div>
 
         {activeTab === "dashboard" && balance && (
           <div className="dashboard-content">
             <div className="summary-cards">
-              <div className="summary-card total-rent">
-                <div className="card-icon">🏠</div>
-                <div className="card-info">
-                  <h3>Monthly Rent</h3>
-                  <p className="amount">₹{balance.monthlyRent}</p>
-                  <p className="sub">per person</p>
-                </div>
-              </div>
-              <div className="summary-card rent-collected">
-                <div className="card-icon">✅</div>
-                <div className="card-info">
-                  <h3>Collected</h3>
-                  <p className="amount">₹{balance.rentCollected}</p>
-                  <p className="sub">{balance.totalMembers - selectedGroup.members.filter(m => m.rentPaid).length} pending</p>
-                </div>
-              </div>
-              <div className="summary-card rent-pending">
-                <div className="card-icon">⏳</div>
-                <div className="card-info">
-                  <h3>Pending</h3>
-                  <p className="amount">₹{balance.rentPending}</p>
-                  <p className="sub">{selectedGroup.members.filter(m => !m.rentPaid).length} members</p>
-                </div>
-              </div>
               <div className="summary-card total-expenses">
                 <div className="card-icon">💸</div>
                 <div className="card-info">
                   <h3>Total Expenses</h3>
-                  <p className="amount">₹{expenses.reduce((sum, e) => sum + e.amount, 0)}</p>
-                  <p className="sub">{expenses.length} transactions</p>
+                  <p className="amount">₹{balance.totalExpenses}</p>
+                </div>
+              </div>
+              <div className="summary-card monthly">
+                <div className="card-icon">📅</div>
+                <div className="card-info">
+                  <h3>Monthly Goal</h3>
+                  <p className="amount">₹{balance.monthlyContribution}</p>
                 </div>
               </div>
             </div>
@@ -416,54 +426,75 @@ class GroupManager extends Component {
               <button className="quick-action-btn" onClick={() => this.setState({ showExpenseModal: true })}>
                 <span>➕</span> Add Expense
               </button>
-              <button className="quick-action-btn secondary" onClick={() => this.setState({ showSettleModal: true })}>
-                <span>🤝</span> Settle Up
+              <button className="quick-action-btn secondary" onClick={() => this.setState({ showPaymentModal: true })}>
+                <span>💸</span> Pay Someone
+              </button>
+              <button className="quick-action-btn secondary" onClick={() => this.setState({ showAddMoneyModal: true })}>
+                <span>💵</span> Add Money
               </button>
             </div>
 
             <div className="members-section">
               <div className="section-header">
-                <h2>👥 Member Balances</h2>
-                <button className="btn-small" onClick={this.resetRent}>Reset Monthly</button>
+                <h2>👤 Member Balances</h2>
               </div>
               <div className="members-list">
                 {balance.balances.map((member, index) => (
-                  <div key={member.name} className={`member-card ${member.rentPaid ? "paid" : "pending"}`}>
+                  <div key={member.name} className={`member-card ${member.balance >= 0 ? "positive" : "negative"}`}>
                     <div className="member-avatar" style={{ background: this.getMemberColor(index) }}>
                       {this.getMemberInitials(member.name)}
                     </div>
                     <div className="member-info">
                       <h4>{member.name}</h4>
                       <p className="balance">
-                        {member.netBalance > 0 ? `+₹${member.netBalance} to receive` : 
-                         member.netBalance < 0 ? `₹${Math.abs(member.netBalance)} owes` : 
-                         "✅ Settled"}
+                        {member.balance > 0 ? `+₹${member.balance} to receive` : 
+                         member.balance < 0 ? `₹${Math.abs(member.balance)} to pay` : 
+                         "Settled"}
                       </p>
                     </div>
-                    <div className="rent-toggle">
-                      <span className={`rent-badge ${member.rentPaid ? "paid" : ""}`}>
-                        {member.rentPaid ? "✅ Paid" : "⏳ Pending"}
-                      </span>
-                      <button 
-                        className={`toggle-btn ${member.rentPaid ? "unpay" : "pay"}`}
-                        onClick={() => this.toggleRentStatus(member.name, member.rentPaid)}
-                      >
-                        {member.rentPaid ? "Mark Unpaid" : "Mark Paid"}
-                      </button>
+                    <div className="member-stats">
+                      <div className="stat-item">
+                        <span className="label">Paid</span>
+                        <span className="value">₹{member.totalPaid}</span>
+                      </div>
+                      <div className="stat-item">
+                        <span className="label">Balance</span>
+                        <span className={`value ${member.balance >= 0 ? "positive" : "negative"}`}>
+                          {member.balance >= 0 ? "+" : ""}₹{member.balance}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
+
+            {balance.settlements && balance.settlements.length > 0 && (
+              <div className="settlements-section">
+                <div className="section-header">
+                  <h2>🔄 Suggested Settlements</h2>
+                </div>
+                <div className="settlements-list">
+                  {balance.settlements.map((settle, i) => (
+                    <div key={i} className="settlement-item">
+                      <span className="from">{settle.from}</span>
+                      <span className="arrow">→</span>
+                      <span className="to">{settle.to}</span>
+                      <span className="amount">₹{settle.amount}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
         {activeTab === "expenses" && (
           <div className="expenses-content">
             <div className="section-header">
-              <h2>📋 Group Expenses</h2>
+              <h2>📋 All Transactions</h2>
               <button className="btn-primary" onClick={() => this.setState({ showExpenseModal: true })}>
-                ➕ Add Expense
+                ➕ Add
               </button>
             </div>
 
@@ -471,7 +502,7 @@ class GroupManager extends Component {
               <div className="no-expenses">
                 <div className="empty-icon">📝</div>
                 <h3>No expenses yet</h3>
-                <p>Add your first group expense!</p>
+                <p>Add your first expense!</p>
               </div>
             ) : (
               <div className="expenses-list">
@@ -484,60 +515,65 @@ class GroupManager extends Component {
                     </div>
                     <div className="expense-amount">
                       <p className="amount">₹{expense.amount}</p>
-                      <p className="split">₹{(expense.amount / expense.splitBetween.length).toFixed(0)}/person</p>
                       <button className="delete-btn" onClick={() => this.deleteExpense(expense.expenseId)}>Delete</button>
                     </div>
                   </div>
                 ))}
               </div>
             )}
+          </div>
+        )}
 
-            {expenses.length > 0 && (
-              <div className="expense-summary">
-                <div className="summary-row">
-                  <span>Total Expenses</span>
-                  <span className="total-amount">₹{expenses.reduce((sum, e) => sum + e.amount, 0)}</span>
-                </div>
-                <div className="summary-row">
-                  <span>Per Person</span>
-                  <span>₹{(expenses.reduce((sum, e) => sum + e.amount, 0) / selectedGroup.members.length).toFixed(0)}</span>
-                </div>
+        {activeTab === "settle" && balance && (
+          <div className="settle-content">
+            <div className="section-header">
+              <h2>🤝 Settle Up</h2>
+            </div>
+            
+            {balance.settlements && balance.settlements.length > 0 ? (
+              <div className="settlements-full">
+                <h3>How to Settle</h3>
+                {balance.settlements.map((settle, i) => (
+                  <div key={i} className="settlement-card">
+                    <div className="settlement-person from">
+                      <div className="avatar" style={{ background: this.getMemberColor(i) }}>
+                        {this.getMemberInitials(settle.from)}
+                      </div>
+                      <span>{settle.from}</span>
+                    </div>
+                    <div className="settlement-arrow">
+                      <span className="amount">₹{settle.amount}</span>
+                      <span className="arrow">→</span>
+                    </div>
+                    <div className="settlement-person to">
+                      <div className="avatar" style={{ background: this.getMemberColor(i + 1) }}>
+                        {this.getMemberInitials(settle.to)}
+                      </div>
+                      <span>{settle.to}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="no-settlements">
+                <div className="empty-icon">✅</div>
+                <h3>All Settled!</h3>
+                <p>Everyone is even - no payments needed.</p>
               </div>
             )}
-          </div>
-        )}
 
-        {activeTab === "members" && selectedGroup && (
-          <div className="members-content">
-            <div className="section-header">
-              <h2>👥 All Members</h2>
-            </div>
-            <div className="members-grid">
-              {selectedGroup.members.map((member, index) => (
-                <div key={index} className={`member-detail-card ${member.rentPaid ? "paid" : "pending"}`}>
-                  <div className="member-avatar large" style={{ background: this.getMemberColor(index) }}>
-                    {this.getMemberInitials(member.name)}
-                  </div>
-                  <h3>{member.name}</h3>
-                  <div className="member-status">
-                    <span className={`status-badge ${member.rentPaid ? "paid" : ""}`}>
-                      {member.rentPaid ? "✅ Rent Paid" : "⏳ Rent Pending"}
-                    </span>
-                  </div>
-                  <div className="member-actions">
-                    <button 
-                      className={`toggle-btn ${member.rentPaid ? "unpay" : "pay"}`}
-                      onClick={() => this.toggleRentStatus(member.name, member.rentPaid)}
-                    >
-                      {member.rentPaid ? "Mark Unpaid" : "Mark Paid"}
-                    </button>
-                  </div>
-                </div>
-              ))}
+            <div className="settle-actions">
+              <button className="quick-action-btn" onClick={() => this.setState({ showPaymentModal: true })}>
+                <span>💸</span> Record a Payment
+              </button>
+              <button className="quick-action-btn secondary" onClick={() => this.setState({ showAddMoneyModal: true })}>
+                <span>💵</span> Add Money to Group
+              </button>
             </div>
           </div>
         )}
 
+        {/* Add Expense Modal */}
         {showExpenseModal && (
           <div className="modal-overlay" onClick={() => this.setState({ showExpenseModal: false })}>
             <div className="modal" onClick={e => e.stopPropagation()}>
@@ -595,6 +631,114 @@ class GroupManager extends Component {
               <div className="modal-footer">
                 <button className="btn-secondary" onClick={() => this.setState({ showExpenseModal: false })}>Cancel</button>
                 <button className="btn-primary" onClick={this.addExpense}>Add Expense</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Payment Modal */}
+        {showPaymentModal && (
+          <div className="modal-overlay" onClick={() => this.setState({ showPaymentModal: false })}>
+            <div className="modal" onClick={e => e.stopPropagation()}>
+              <div className="modal-header">
+                <h2>💸 Make Payment</h2>
+                <button className="close-btn" onClick={() => this.setState({ showPaymentModal: false })}>×</button>
+              </div>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label>From</label>
+                  <select
+                    value={newPayment.from}
+                    onChange={e => this.setState({ newPayment: { ...newPayment, from: e.target.value } })}
+                  >
+                    <option value="">Who is paying?</option>
+                    {selectedGroup.members.map(m => (
+                      <option key={m.name} value={m.name}>{m.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>To</label>
+                  <select
+                    value={newPayment.to}
+                    onChange={e => this.setState({ newPayment: { ...newPayment, to: e.target.value } })}
+                  >
+                    <option value="">Who receives?</option>
+                    {selectedGroup.members.map(m => (
+                      <option key={m.name} value={m.name}>{m.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Amount</label>
+                  <input
+                    type="number"
+                    placeholder="e.g., 1000"
+                    value={newPayment.amount}
+                    onChange={e => this.setState({ newPayment: { ...newPayment, amount: e.target.value } })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Note (optional)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g., Rent part payment"
+                    value={newPayment.note}
+                    onChange={e => this.setState({ newPayment: { ...newPayment, note: e.target.value } })}
+                  />
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button className="btn-secondary" onClick={() => this.setState({ showPaymentModal: false })}>Cancel</button>
+                <button className="btn-primary" onClick={this.makePayment}>Record Payment</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Add Money Modal */}
+        {showAddMoneyModal && (
+          <div className="modal-overlay" onClick={() => this.setState({ showAddMoneyModal: false })}>
+            <div className="modal" onClick={e => e.stopPropagation()}>
+              <div className="modal-header">
+                <h2>💵 Add Money</h2>
+                <button className="close-btn" onClick={() => this.setState({ showAddMoneyModal: false })}>×</button>
+              </div>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label>Member Name</label>
+                  <select
+                    value={addMoney.memberName}
+                    onChange={e => this.setState({ addMoney: { ...addMoney, memberName: e.target.value } })}
+                  >
+                    <option value="">Select member</option>
+                    {selectedGroup.members.map(m => (
+                      <option key={m.name} value={m.name}>{m.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Amount</label>
+                  <input
+                    type="number"
+                    placeholder="e.g., 2000"
+                    value={addMoney.amount}
+                    onChange={e => this.setState({ addMoney: { ...addMoney, amount: e.target.value } })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Note (optional)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g., Monthly rent"
+                    value={addMoney.note}
+                    onChange={e => this.setState({ addMoney: { ...addMoney, note: e.target.value } })}
+                  />
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button className="btn-secondary" onClick={() => this.setState({ showAddMoneyModal: false })}>Cancel</button>
+                <button className="btn-primary" onClick={this.addGroupMoney}>Add Money</button>
               </div>
             </div>
           </div>
