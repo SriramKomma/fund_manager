@@ -50,6 +50,8 @@ async function connectDB() {
 }
 connectDB();
 
+const JWT_SECRET = process.env.JWT_SECRET || "first_project_fullstack";
+
 // Authentication Middleware
 const verifyToken = (req, res, next) => {
   // Accept token from either an httpOnly cookie or the Authorization header.
@@ -63,7 +65,7 @@ const verifyToken = (req, res, next) => {
 
   if (!token) return res.status(401).json({ error: "Unauthorized, No Token" });
 
-  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+  jwt.verify(token, JWT_SECRET, (err, decoded) => {
     if (err) {
       console.error("Token verification failed:", err);
       return res.status(401).json({ error: "Unauthorized, Invalid Token" });
@@ -146,7 +148,7 @@ app.post("/login", async (req, res) => {
 
     const token = jwt.sign(
       { userId: user._id.toString(), email: user.email },
-      process.env.JWT_SECRET,
+      JWT_SECRET,
       { expiresIn: "1h" }
     );
 
