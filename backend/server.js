@@ -15,6 +15,11 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 3001;
 
+// Health check endpoint
+app.get("/health", (req, res) => {
+  res.json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
 // Middleware
 app.use(
   cors({
@@ -47,10 +52,18 @@ connectDB();
 
 // Authentication Middleware
 const verifyToken = (req, res, next) => {
-  const token = req.cookies.jwt_token;
+  // Accept token from either an httpOnly cookie or the Authorization header.
+  let token = req.cookies && req.cookies.jwt_token;
+  if (!token && req.headers && req.headers.authorization) {
+    const parts = req.headers.authorization.split(" ");
+    if (parts.length === 2 && /^Bearer$/i.test(parts[0])) {
+      token = parts[1];
+    }
+  }
+
   if (!token) return res.status(401).json({ error: "Unauthorized, No Token" });
 
-  jwt.verify(token, "first_project_fullstack", (err, decoded) => {
+  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
     if (err) {
       console.error("Token verification failed:", err);
       return res.status(401).json({ error: "Unauthorized, Invalid Token" });
@@ -133,7 +146,7 @@ app.post("/login", async (req, res) => {
 
     const token = jwt.sign(
       { userId: user._id.toString(), email: user.email },
-      "first_project_fullstack",
+      process.env.JWT_SECRET,
       { expiresIn: "1h" }
     );
 
@@ -163,10 +176,12 @@ app.post("/login", async (req, res) => {
 });
 // User Logout
 app.post("/logout", (req, res) => {
+  // Clear the cookie using the same options used to set it (secure depends on env)
   res.cookie("jwt_token", "", {
     httpOnly: true,
-    secure: true,
+    secure: process.env.NODE_ENV === "production",
     sameSite: "None",
+    path: "/",
     expires: new Date(0),
   });
   res.json({ message: "Logged out successfully" });
@@ -190,9 +205,10 @@ app.get("/transaction", verifyToken, async (req, res) => {
 });
 
 // Create Transaction
-app.post("/transaction", async (req, res) => {
+app.post("/transaction", verifyToken, async (req, res) => {
   console.log("Transaction request received:", req.body);
-  const { title, amount, type, userId } = req.body;
+  const { title, amount, type } = req.body;
+  const userId = req.user.userId;
 
   if (!title || !amount || !type || !userId) {
     console.log("Validation failed: Missing fields");

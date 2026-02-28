@@ -15,6 +15,8 @@ const transactionTypeOptions = [
   { optionId: "EXPENSES", displayText: "Expenses" },
 ];
 
+const API_URL = process.env.REACT_APP_API_URL || "";
+
 class MoneyManager extends Component {
   state = {
     transactionsList: [],
@@ -58,10 +60,10 @@ class MoneyManager extends Component {
     );
     console.log(
       "Fetching transactions with URL:",
-      process.env.REACT_APP_API_URL + "/transaction"
+      API_URL + "/transaction"
     );
     axios
-      .get(`${process.env.REACT_APP_API_URL}/transaction`, {
+      .get(`${API_URL}/transaction`, {
         headers: { Authorization: token ? `Bearer ${token}` : "" },
         withCredentials: true,
       })
@@ -121,33 +123,29 @@ class MoneyManager extends Component {
 
   processPayment = (amount) => {
     const upiId = "7093085723@ybl";
-    const userId = JSON.parse(localStorage.getItem("user"))?.userId;
-
-    if (!userId) {
-      this.setState({ transactionStatus: "Error: User not logged in" });
-      return;
-    }
 
     const upiIntent = `upi://pay?pa=${upiId}&pn=Payee&am=${amount}&cu=INR`;
     window.location.href = upiIntent;
 
     setTimeout(() => {
       this.setState({ transactionStatus: "Transaction Success" });
-      this.addExpenseAfterPayment(amount, userId);
+      this.addExpenseAfterPayment(amount);
     }, 2000);
   };
 
-  addExpenseAfterPayment = (amount, userId) => {
+  addExpenseAfterPayment = (amount) => {
+    const user = JSON.parse(localStorage.getItem("user")) || {};
+    const token = user.token || Cookies.get("jwt_token") || "";
     const expense = {
       title: "UPI Payment",
       amount: amount,
       type: "Expenses",
-      userId: userId,
       date: new Date().toISOString(),
     };
 
     axios
-      .post(`${process.env.REACT_APP_API_URL}/transaction`, expense, {
+      .post(`${API_URL}/transaction`, expense, {
+        headers: { Authorization: token ? `Bearer ${token}` : "" },
         withCredentials: true,
       })
       .then((response) => {
@@ -174,8 +172,11 @@ class MoneyManager extends Component {
   };
 
   deleteTransaction = (transactionId) => {
+    const user = JSON.parse(localStorage.getItem("user")) || {};
+    const token = user.token || Cookies.get("jwt_token") || "";
     axios
-      .delete(`${process.env.REACT_APP_API_URL}/transaction/${transactionId}`, {
+      .delete(`${API_URL}/transaction/${transactionId}`, {
+        headers: { Authorization: token ? `Bearer ${token}` : "" },
         withCredentials: true,
       })
       .then((response) => {
@@ -195,8 +196,11 @@ class MoneyManager extends Component {
   };
 
   clearAllTransactions = () => {
+    const user = JSON.parse(localStorage.getItem("user")) || {};
+    const token = user.token || Cookies.get("jwt_token") || "";
     axios
-      .delete(`${process.env.REACT_APP_API_URL}/transactions/clear`, {
+      .delete(`${API_URL}/transactions/clear`, {
+        headers: { Authorization: token ? `Bearer ${token}` : "" },
         withCredentials: true,
       })
       .then((response) => {
@@ -218,11 +222,16 @@ class MoneyManager extends Component {
       "Data:",
       updatedTransaction
     );
+    const user = JSON.parse(localStorage.getItem("user")) || {};
+    const token = user.token || Cookies.get("jwt_token") || "";
     axios
       .put(
-        `${process.env.REACT_APP_API_URL}/transaction/${transactionId}`,
+        `${API_URL}/transaction/${transactionId}`,
         updatedTransaction,
-        { withCredentials: true }
+        {
+          headers: { Authorization: token ? `Bearer ${token}` : "" },
+          withCredentials: true,
+        }
       )
       .then((response) => {
         console.log("Update response:", response.data);
@@ -242,23 +251,21 @@ class MoneyManager extends Component {
     const typeOption = transactionTypeOptions.find(
       (opt) => opt.optionId === optionId
     );
-    const userId = JSON.parse(localStorage.getItem("user"))?.userId;
-
-    if (!userId) {
-      console.error("User ID not found!");
-      return;
-    }
+    const user = JSON.parse(localStorage.getItem("user")) || {};
+    const token = user.token || Cookies.get("jwt_token") || "";
 
     axios
       .post(
-        `${process.env.REACT_APP_API_URL}/transaction`,
+        `${API_URL}/transaction`,
         {
           title: titleInput,
           amount: parseInt(amountInput),
           type: typeOption.displayText,
-          userId,
         },
-        { withCredentials: true }
+        {
+          headers: { Authorization: token ? `Bearer ${token}` : "" },
+          withCredentials: true,
+        }
       )
       .then((response) => {
         console.log("Add transaction response:", response.data);
@@ -302,7 +309,7 @@ class MoneyManager extends Component {
   logout = () => {
     axios
       .post(
-        `${process.env.REACT_APP_API_URL}/logout`,
+        `${API_URL}/logout`,
         {},
         {
           withCredentials: true,
@@ -310,7 +317,8 @@ class MoneyManager extends Component {
       )
       .then((response) => {
         console.log("Logout response:", response.data);
-        Cookies.remove("jwt_token");
+        // Clear client-side user state and navigate to login. Server clears the httpOnly cookie.
+        localStorage.removeItem("user");
         window.location.href = "/login";
       })
       .catch((error) => {
@@ -319,8 +327,11 @@ class MoneyManager extends Component {
   };
 
   downloadPDF = () => {
+    const user = JSON.parse(localStorage.getItem("user")) || {};
+    const token = user.token || Cookies.get("jwt_token") || "";
     axios
-      .get(`${process.env.REACT_APP_API_URL}/generate-pdf`, {
+      .get(`${API_URL}/generate-pdf`, {
+        headers: { Authorization: token ? `Bearer ${token}` : "" },
         withCredentials: true,
         responseType: "blob",
       })

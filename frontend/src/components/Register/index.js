@@ -1,7 +1,8 @@
 import { Component } from "react";
 import { Redirect } from "react-router-dom";
-import Cookies from "js-cookie";
 import "./index.css";
+
+const API_URL = process.env.REACT_APP_API_URL || "";
 
 class Register extends Component {
   state = {
@@ -49,7 +50,7 @@ class Register extends Component {
     }
 
     const userDetails = { username, email, password };
-    const url = `${process.env.REACT_APP_API_URL}/register`; // Use environment variable
+    const url = `${API_URL}/register`;
     const options = {
       method: "POST",
       headers: {
@@ -135,8 +136,8 @@ class Register extends Component {
 
   render() {
     const { showSubmitError, errorMsg } = this.state;
-    const jwtToken = Cookies.get("jwt_token");
-    if (jwtToken !== undefined) {
+    const jwtToken = JSON.parse(localStorage.getItem("user"))?.token;
+    if (jwtToken) {
       return <Redirect to="/" />;
     }
     return (

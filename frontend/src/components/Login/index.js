@@ -1,8 +1,9 @@
 import { Component } from "react";
-import Cookies from "js-cookie";
 import { Redirect } from "react-router-dom";
 import axios from "axios";
 import "./index.css";
+
+const API_URL = process.env.REACT_APP_API_URL || "";
 
 class Login extends Component {
   state = {
@@ -22,12 +23,6 @@ class Login extends Component {
 
   onSubmitSuccess = (data) => {
     const { history } = this.props;
-    Cookies.set("jwt_token", data.token, {
-      expires: 30,
-      path: "/",
-      sameSite: "none",
-      secure: true,
-    });
     const userData = {
       userId: data.userId,
       username: data.username,
@@ -59,7 +54,7 @@ class Login extends Component {
 
     try {
       const response = await axios.post(
-        `${process.env.REACT_APP_API_URL}/login`,
+        `${API_URL}/login`,
         { email, password },
         { withCredentials: true }
       );
@@ -121,8 +116,8 @@ class Login extends Component {
 
   render() {
     const { showSubmitError, errorMsg } = this.state;
-    const jwtToken = Cookies.get("jwt_token");
-    if (jwtToken !== undefined) {
+    const jwtToken = JSON.parse(localStorage.getItem("user"))?.token;
+    if (jwtToken) {
       return <Redirect to="/" />;
     }
     return (
